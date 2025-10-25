@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mockAuthAPI } from '../api/mockAuth';
+import * as authApi from '../api/authApi';
+import {
+  setAccessToken,
+  setUserData,
+  clearAuth,
+  getAccessToken,
+  getUserData,
+} from '../utils/auth';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -9,14 +16,11 @@ export const useAuthStore = create((set, get) => ({
 
   checkAuthState: async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      const userData = await AsyncStorage.getItem('user_data');
-      
+      const token = await getAccessToken();
+      const userData = await getUserData();
+
       if (token && userData) {
-        set({ 
-          token, 
-          user: JSON.parse(userData) 
-        });
+        set({ token, user: userData });
       }
     } catch (error) {
       console.error('Error checking auth state:', error);
@@ -26,17 +30,49 @@ export const useAuthStore = create((set, get) => ({
   login: async (email, password) => {
     set({ loading: true });
     try {
-      const response = await mockAuthAPI.login(email, password);
-      
-      await AsyncStorage.setItem('auth_token', response.token);
-      await AsyncStorage.setItem('user_data', JSON.stringify(response.user));
-      
-      set({ 
-        token: response.token, 
-        user: response.user,
-        loading: false 
-      });
-      
+      const response = await authApi.login({ email, password });
+      // response may have many shapes depending on backend (token, access_token, tokens.access, data: { token, user }, etc.)
+      const maybe = (obj, path) =>
+        path.split('.').reduce((acc, k) => acc && acc[k], obj);
+
+      const tokenCandidates = [
+        response?.access_token,
+        response?.accessToken,
+        response?.token,
+        maybe(response, 'tokens.access'),
+        maybe(response, 'data.access_token'),
+        maybe(response, 'data.accessToken'),
+        maybe(response, 'data.token'),
+        maybe(response, 'data.tokens.access'),
+      ];
+
+      let token =
+        tokenCandidates.find((t) => t !== undefined && t !== null) || null;
+
+      // If token is an object with nested value, try common properties
+      if (token && typeof token === 'object') {
+        token = token.token || token.access || token.value || null;
+      }
+
+      const user =
+        response?.user ||
+        maybe(response, 'data.user') ||
+        maybe(response, 'data') ||
+        null;
+
+      // Ensure token is a string before persisting
+      if (token) {
+        const tokenStr = typeof token === 'string' ? token : String(token);
+        await setAccessToken(tokenStr);
+        set({ token: tokenStr });
+      }
+
+      if (user) {
+        await setUserData(user);
+        set({ user });
+      }
+
+      set({ loading: false });
       return response;
     } catch (error) {
       set({ loading: false });
@@ -47,17 +83,45 @@ export const useAuthStore = create((set, get) => ({
   register: async (userData) => {
     set({ loading: true });
     try {
-      const response = await mockAuthAPI.register(userData);
-      
-      await AsyncStorage.setItem('auth_token', response.token);
-      await AsyncStorage.setItem('user_data', JSON.stringify(response.user));
-      
-      set({ 
-        token: response.token, 
-        user: response.user,
-        loading: false 
-      });
-      
+      const response = await authApi.register(userData);
+
+      const maybe = (obj, path) =>
+        path.split('.').reduce((acc, k) => acc && acc[k], obj);
+
+      const tokenCandidates = [
+        response?.access_token,
+        response?.accessToken,
+        response?.token,
+        maybe(response, 'tokens.access'),
+        maybe(response, 'data.access_token'),
+        maybe(response, 'data.accessToken'),
+        maybe(response, 'data.token'),
+        maybe(response, 'data.tokens.access'),
+      ];
+
+      let token =
+        tokenCandidates.find((t) => t !== undefined && t !== null) || null;
+      if (token && typeof token === 'object')
+        token = token.token || token.access || token.value || null;
+
+      const user =
+        response?.user ||
+        maybe(response, 'data.user') ||
+        maybe(response, 'data') ||
+        null;
+
+      if (token) {
+        const tokenStr = typeof token === 'string' ? token : String(token);
+        await setAccessToken(tokenStr);
+        set({ token: tokenStr });
+      }
+
+      if (user) {
+        await setUserData(user);
+        set({ user });
+      }
+
+      set({ loading: false });
       return response;
     } catch (error) {
       set({ loading: false });
@@ -68,15 +132,13 @@ export const useAuthStore = create((set, get) => ({
   updateProfile: async (userData) => {
     set({ loading: true });
     try {
-      const response = await mockAuthAPI.updateProfile(userData);
-      
-      await AsyncStorage.setItem('user_data', JSON.stringify(response.user));
-      
-      set({ 
-        user: response.user,
-        loading: false 
-      });
-      
+      const response = await authApi.updateProfile(userData);
+
+      const user = response?.user || response?.data || null;
+      if (user) await setUserData(user);
+
+      set({ user, loading: false });
+
       return response;
     } catch (error) {
       set({ loading: false });
@@ -86,13 +148,11 @@ export const useAuthStore = create((set, get) => ({
 
   logout: async () => {
     try {
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('user_data');
-      
-      set({ 
-        token: null, 
-        user: null 
-      });
+      await clearAuth();
+      //const response = await authApi.logout();
+
+      set({ token: null, user: null });
+      //return response;
     } catch (error) {
       console.error('Error logging out:', error);
     }

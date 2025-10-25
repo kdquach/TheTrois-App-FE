@@ -6,6 +6,7 @@ import { useThemeStore } from '../store/themeStore';
 import { lightTheme, darkTheme } from '../config/theme';
 import Toast from 'react-native-toast-message';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { LoadingProvider } from '../contexts/LoadingContext';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -14,14 +15,17 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={theme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      <Toast />
+      <LoadingProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="auth" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="product/[id]" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <Toast />
+      </LoadingProvider>
     </PaperProvider>
   );
 }

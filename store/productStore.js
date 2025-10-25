@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { mockProductAPI } from '../api/mockProducts';
+import * as productApi from '../api/productApi';
 
 export const useProductStore = create((set, get) => ({
   products: [],
@@ -10,14 +10,14 @@ export const useProductStore = create((set, get) => ({
     set({ loading: true });
     try {
       const [productsData, categoriesData] = await Promise.all([
-        mockProductAPI.getProducts(),
-        mockProductAPI.getCategories()
+        productApi.getProducts({ params: { page: 1, limit: 100 } }),
+        productApi.getCategories(),
       ]);
-      
-      set({ 
-        products: productsData, 
-        categories: categoriesData,
-        loading: false 
+
+      set({
+        products: productsData.results || [],
+        categories: categoriesData.results || [],
+        loading: false,
       });
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -27,6 +27,6 @@ export const useProductStore = create((set, get) => ({
 
   getProductById: (id) => {
     const { products } = get();
-    return products.find(product => product.id === id);
+    return products.find((product) => product.id === id);
   },
 }));
