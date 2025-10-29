@@ -22,20 +22,23 @@ import {
   Surface,
   Badge,
   ProgressBar,
+  ActivityIndicator,
 } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
 import Toast from 'react-native-toast-message';
+import { changePassword } from '../../api/authApi';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { user, logout, updateProfile } = useAuthStore();
+  const { user, logout, updateProfile, loading } = useAuthStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
 
   const [editDialogVisible, setEditDialogVisible] = useState(false);
@@ -50,6 +53,11 @@ export default function ProfileScreen() {
     newPassword: '',
     confirmPassword: '',
   });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
@@ -81,18 +89,68 @@ export default function ProfileScreen() {
     }
 
     try {
-      await updateProfile(editForm);
+      const response = await updateProfile(editForm);
       setEditDialogVisible(false);
       Toast.show({
         type: 'success',
         text1: 'Thành công',
-        text2: 'Cập nhật thông tin thành công',
+        text2: response.message || 'Cập nhật thông tin thành công',
       });
     } catch (error) {
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
         text2: error.message || 'Cập nhật thất bại',
+      });
+    }
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Toast.show({
+          type: 'error',
+          text1: 'Quyền bị từ chối',
+          text2: 'Vui lòng cấp quyền truy cập thư viện ảnh để tải lên avatar',
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        Toast.show({ type: 'error', text1: 'Không lấy được ảnh' });
+        return;
+      }
+
+      const uri = asset.uri;
+      const filenameFromUri = uri.split('/').pop() || `avatar_${Date.now()}.jpg`;
+      const ext = (filenameFromUri.split('.').pop() || 'jpg').toLowerCase();
+      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic' };
+      const type = asset.mimeType || mimeMap[ext] || 'image/jpeg';
+
+      const file = { uri, name: filenameFromUri, type };
+
+      // Gọi updateProfile trong store để upload avatar
+      await updateProfile({ avatar: file });
+      Toast.show({
+        type: 'success',
+        text1: 'Cập nhật avatar thành công',
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Tải lên thất bại',
+        text2: error?.message || 'Vui lòng thử lại',
       });
     }
   };
@@ -118,26 +176,27 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
-        text2: 'Mật khẩu mới phải có ít nhất 6 ký tự',
+        text2: 'Mật khẩu mới phải có ít nhất 8 ký tự',
       });
       return;
     }
 
     try {
       setChangePasswordDialogVisible(false);
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
+      await changePassword({ currentPassword, newPassword });
       Toast.show({
         type: 'success',
         text1: 'Thành công',
         text2: 'Đổi mật khẩu thành công',
+      });
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
       });
     } catch (error) {
       Toast.show({
@@ -270,7 +329,7 @@ export default function ProfileScreen() {
           icon: 'bell-outline',
           isSwitch: true,
           value: true,
-          onPress: () => {},
+          onPress: () => { },
         },
       ],
     },
@@ -281,22 +340,22 @@ export default function ProfileScreen() {
         {
           title: 'Điều khoản sử dụng',
           icon: 'file-document-outline',
-          onPress: () => {},
+          onPress: () => { },
         },
         {
           title: 'Chính sách bảo mật',
           icon: 'shield-check-outline',
-          onPress: () => {},
+          onPress: () => { },
         },
         {
           title: 'Liên hệ hỗ trợ',
           icon: 'phone-outline',
-          onPress: () => {},
+          onPress: () => { },
         },
         {
           title: 'Đánh giá ứng dụng',
           icon: 'star-outline',
-          onPress: () => {},
+          onPress: () => { },
         },
       ],
     },
@@ -327,9 +386,10 @@ export default function ProfileScreen() {
                     size={90}
                     source={{ uri: user.avatar }}
                     style={{
-                      borderWidth: 4,
                       borderColor: '#FFFFFF',
+                      opacity: loading ? 0.4 : 1, // Làm mờ khi đang upload
                     }}
+
                   />
                 ) : (
                   <Avatar.Text
@@ -343,15 +403,16 @@ export default function ProfileScreen() {
                     labelStyle={styles.avatarLabel}
                   />
                 )}
+                {/* 🔥 Overlay loading trong avatar */}
+                {loading && (
+                  <View style={styles.avatarLoading}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                )}
               </Surface>
               <TouchableOpacity
                 style={styles.cameraButton}
-                onPress={() => {
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Tính năng đang phát triển',
-                  });
-                }}
+                onPress={handlePickAvatar}
                 activeOpacity={0.7}
               >
                 <LinearGradient
@@ -706,9 +767,15 @@ export default function ProfileScreen() {
                 setPasswordForm({ ...passwordForm, currentPassword: text })
               }
               mode="outlined"
-              secureTextEntry
+              secureTextEntry={!showCurrentPassword}
               style={styles.input}
               left={<TextInput.Icon icon="lock" />}
+              right={
+                <TextInput.Icon
+                  icon={showCurrentPassword ? 'eye-off' : 'eye'}
+                  onPress={() => setShowCurrentPassword((v) => !v)}
+                />
+              }
             />
             <TextInput
               label="Mật khẩu mới"
@@ -717,9 +784,15 @@ export default function ProfileScreen() {
                 setPasswordForm({ ...passwordForm, newPassword: text })
               }
               mode="outlined"
-              secureTextEntry
+              secureTextEntry={!showNewPassword}
               style={styles.input}
               left={<TextInput.Icon icon="lock-reset" />}
+              right={
+                <TextInput.Icon
+                  icon={showNewPassword ? 'eye-off' : 'eye'}
+                  onPress={() => setShowNewPassword((v) => !v)}
+                />
+              }
             />
             <TextInput
               label="Xác nhận mật khẩu mới"
@@ -728,9 +801,15 @@ export default function ProfileScreen() {
                 setPasswordForm({ ...passwordForm, confirmPassword: text })
               }
               mode="outlined"
-              secureTextEntry
+              secureTextEntry={!showConfirmPassword}
               style={styles.input}
               left={<TextInput.Icon icon="lock-check" />}
+              right={
+                <TextInput.Icon
+                  icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                  onPress={() => setShowConfirmPassword((v) => !v)}
+                />
+              }
             />
           </Dialog.Content>
           <Dialog.Actions>
@@ -1093,4 +1172,16 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 12,
   },
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)', // lớp mờ trên avatar
+    borderRadius: 90 / 2, // bo tròn để khớp với avatar
+  },
+
 });
