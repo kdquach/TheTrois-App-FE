@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { use, useCallback, useEffect, useState } from "react";
 import { View, FlatList } from "react-native";
 import {
   Appbar,
@@ -11,14 +11,18 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native-paper";
-import { router } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import Toast from "react-native-toast-message";
 import { getMyAddresses, deleteAddress } from "../../api/addressesApi";
+import { useAddressStore } from "../../store/addressStore";
 
 export default function AddressListScreen() {
   const [loading, setLoading] = useState(false);
   const [addresses, setAddresses] = useState([]);
   const [confirm, setConfirm] = useState({ visible: false, item: null });
+
+  const { setSelectedAddress } = useAddressStore();
+  const { from } = useLocalSearchParams();
 
   const palette = {
     background: "#FAF9F6",
@@ -27,6 +31,18 @@ export default function AddressListScreen() {
     beige: "#E9E3D5",
     textPrimary: "#3E3B32",
     textSecondary: "#6B675F",
+  };
+  useFocusEffect(
+    useCallback(() => {
+      fetchAddresses();
+    }, [])
+  );
+
+  const onChangeAddress = (address) => {
+    setSelectedAddress(address);
+    if (from === "cart") {
+      router.back();
+    }
   };
 
   const fetchAddresses = async () => {
@@ -83,8 +99,9 @@ export default function AddressListScreen() {
           backgroundColor: palette.card,
           elevation: 1,
         }}
+        onPress={() => onChangeAddress(item)}
       >
-        <View style={{ flexDirection: "row", padding: 14, alignItems: "center" }}>
+        <View style={{ flexDirection: "row", padding: 14, alignItems: "center" }} >
           <View style={{ flex: 1 }}>
             <Text
               variant="titleMedium"
@@ -120,7 +137,7 @@ export default function AddressListScreen() {
   }, []);
 
   const handleAddAddress = () => {
-    if (addresses.length >= 5) {
+    if (addresses?.length >= 5) {
       Toast.show({
         type: "info",
         text1: "Bạn đã đạt tối đa 5 địa chỉ",
@@ -133,7 +150,7 @@ export default function AddressListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <Appbar.Header style={{ backgroundColor: palette.accent }}>
-        <Appbar.BackAction color="white" onPress={() => router.replace("/profile")} />
+        <Appbar.BackAction color="white" onPress={() => router.back()} />
         <Appbar.Content title="Địa chỉ của tôi" color="white" />
       </Appbar.Header>
 

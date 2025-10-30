@@ -25,9 +25,11 @@ import {
   updateAddress,
 } from "../../api/addressesApi";
 import { getProvinces, getDistricts, getWards } from "vietnam-provinces";
+import { useAuthStore } from "../../store/authStore";
 
 export default function AddressForm() {
   const { id, from } = useLocalSearchParams();
+  const { fetchUser, updateAddress } = useAuthStore();
   const isEdit = Boolean(id);
 
   const [saving, setSaving] = useState(false);
@@ -122,8 +124,16 @@ export default function AddressForm() {
         Toast.show({ type: "success", text1: "Đã tạo địa chỉ mới" });
       }
 
-      if (from === "order") router.replace("/order/create/selectAddress");
-      else router.replace("/addresses");
+      if (from === "cart") {
+        router.replace("/checkout"); // Quay lại cart ngay, bỏ qua address list
+      } else if (from === "order") {
+        router.replace("/order/create/selectAddress");
+      } else if (from === "newAddress") {
+        router.replace("/addresses"); // Quay lại cart ngay, bỏ qua address list
+      } else {
+        router.back(); // hoặc router.replace("/addresses") nếu chỉ đang ở profile
+      }
+
     } catch (err) {
       console.log("Error saving address:", err);
       Toast.show({
@@ -166,7 +176,7 @@ export default function AddressForm() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Appbar.Header style={styles.header}>
-        <Appbar.BackAction onPress={() => router.back()} color="#333" />
+        <Appbar.BackAction onPress={() => from === 'cart' ? router.push('/checkout') : router.back()} color="#333" />
         <Appbar.Content
           title={isEdit ? "Chỉnh sửa địa chỉ" : "Thêm địa chỉ"}
           color="#333"
