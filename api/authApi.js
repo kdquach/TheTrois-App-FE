@@ -63,15 +63,35 @@ export const getCurrentUser = async () => {
  * Cập nhật profile
  */
 export const updateProfile = async (userData) => {
+  console.log("🚀 ~ updateProfile ~ userData:", userData.avatar)
   try {
-    const data = await apiClient.put('/auth/profile', userData);
+    const formData = new FormData();
+    for (const key in userData) {
+      if ((key === 'avatar' && userData.avatar?.originFileObj)
+        || (key === 'avatar' && userData.avatar)
+      ) {
+        const fileToUpload = userData.avatar?.originFileObj
+          ? userData.avatar?.originFileObj // web
+          : userData.avatar; // native
+        formData.append('avatar', fileToUpload);
+        continue;
+      }
+      if (userData[key] !== undefined && userData[key] !== null) {
+        formData.append(key, userData[key]);
+      }
+    }
+    const data = await apiClient.patch('/auth/profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return data;
   } catch (error) {
     console.error(
       'updateProfile error:',
       error?.response?.data || error.message
     );
-    throw error;
+    throw error?.response?.data || error;
   }
 };
 
@@ -80,14 +100,14 @@ export const updateProfile = async (userData) => {
  */
 export const changePassword = async (passwordData) => {
   try {
-    const data = await apiClient.put('/auth/change-password', passwordData);
+    const data = await apiClient.patch('/auth/change-password', passwordData);
     return data;
   } catch (error) {
     console.error(
       'changePassword error:',
       error?.response?.data || error.message
     );
-    throw error;
+    throw error.response.data || error;
   }
 };
 

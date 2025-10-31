@@ -143,6 +143,10 @@ export const useAuthStore = create((set, get) => ({
   updateProfile: async (userData) => {
     set({ loading: true });
     try {
+      const currentUser = get().user;
+      if (!currentUser || !currentUser.id) {
+        throw new Error('Please login again.');
+      }
       const response = await authApi.updateProfile(userData);
 
       const user = response?.user || response?.data || null;
