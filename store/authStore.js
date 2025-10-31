@@ -83,6 +83,8 @@ export const useAuthStore = create((set, get) => ({
   register: async (userData) => {
     set({ loading: true });
     try {
+      console.log(userData);
+
       const response = await authApi.register(userData);
 
       const maybe = (obj, path) =>
@@ -139,6 +141,57 @@ export const useAuthStore = create((set, get) => ({
 
       set({ user, loading: false });
 
+      return response;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
+
+  loginWithGoogle: async (googleData) => {
+    set({ loading: true });
+    try {
+      const response = await authApi.loginWithGoogle(googleData);
+
+      const maybe = (obj, path) =>
+        path.split('.').reduce((acc, k) => acc && acc[k], obj);
+
+      const tokenCandidates = [
+        response?.access_token,
+        response?.accessToken,
+        response?.token,
+        maybe(response, 'tokens.access'),
+        maybe(response, 'data.access_token'),
+        maybe(response, 'data.accessToken'),
+        maybe(response, 'data.token'),
+        maybe(response, 'data.tokens.access'),
+      ];
+
+      let token =
+        tokenCandidates.find((t) => t !== undefined && t !== null) || null;
+
+      if (token && typeof token === 'object') {
+        token = token.token || token.access || token.value || null;
+      }
+
+      const user =
+        response?.user ||
+        maybe(response, 'data.user') ||
+        maybe(response, 'data') ||
+        null;
+
+      if (token) {
+        const tokenStr = typeof token === 'string' ? token : String(token);
+        await setAccessToken(tokenStr);
+        set({ token: tokenStr });
+      }
+
+      if (user) {
+        await setUserData(user);
+        set({ user });
+      }
+
+      set({ loading: false });
       return response;
     } catch (error) {
       set({ loading: false });
