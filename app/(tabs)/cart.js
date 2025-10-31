@@ -9,14 +9,21 @@ import {
   List,
   Surface,
   Avatar,
+  Chip,
+  TextInput,
 } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCartStore } from '../../store/cartStore';
 import { formatCurrency } from '../../utils/format';
 import Toast from 'react-native-toast-message';
+import ShippingAddressSection from '../checkout/index';
+import { useCallback, useEffect, useState } from 'react';
+import PaymentMethodSelector from '../checkout/PaymentMethodSelector';
+import { useAuthStore } from '../../store/authStore';
+import { useAddressStore } from '../../store/addressStore';
 
 const { width } = Dimensions.get('window');
 
@@ -30,7 +37,18 @@ export default function CartScreen() {
     getTotalItems,
     clearCart,
   } = useCartStore();
+  const { user, logout, updateProfile, fetchUser } = useAuthStore();
+  const { selectedAddress, setSelectedAddress } = useAddressStore();
 
+  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [showSummary, setShowSummary] = useState(false);
+  const [overlayHeight, setOverlayHeight] = useState(0);
+  const [orderNote, setOrderNote] = useState('');
+
+  useEffect(() => {
+    const address = user?.addresses?.find((a) => a.isDefault === true);
+    setSelectedAddress(address);
+  }, [user]);
   const handleQuantityChange = (productId, newQuantity) => {
     if (newQuantity <= 0) {
       removeFromCart(productId);
@@ -61,6 +79,14 @@ export default function CartScreen() {
     });
     clearCart();
   };
+
+  const getItemUnitPrice = (item) => {
+    const toppingsPrice = item.toppings
+      ? item.toppings.reduce((sum, t) => sum + (t.price || 0), 0)
+      : 0;
+    return (item.price || 0) + toppingsPrice;
+  };
+
 
   const renderCartItem = (item) => (
     <Surface key={item.id} style={styles.cartItem} elevation={2}>
@@ -114,7 +140,7 @@ export default function CartScreen() {
             variant="bodyMedium"
             style={[styles.itemPrice, { color: theme.colors.starbucksGreen }]}
           >
-            {formatCurrency(item.price)} / ly
+            {formatCurrency(getItemUnitPrice(item))} / ly
           </Text>
 
           {item.toppings && item.toppings.length > 0 && (
@@ -126,20 +152,20 @@ export default function CartScreen() {
                   { color: theme.colors.onSurface },
                 ]}
               >
-                🧊 Topping:
+                🧊 Topping
               </Text>
-              {item.toppings.map((topping, index) => (
-                <Text
-                  key={index}
-                  variant="bodySmall"
-                  style={[
-                    styles.topping,
-                    { color: theme.colors.onSurfaceVariant },
-                  ]}
-                >
-                  • {topping.name} (+{formatCurrency(topping.price)})
-                </Text>
-              ))}
+              <View style={styles.toppingsChips}>
+                {item.toppings.map((topping, index) => (
+                  <Chip
+                    key={index}
+                    compact
+                    style={styles.toppingChip}
+                    textStyle={styles.toppingChipText}
+                  >
+                    {topping.name}  +{formatCurrency(topping.price)}
+                  </Chip>
+                ))}
+              </View>
             </Surface>
           )}
 
@@ -171,11 +197,32 @@ export default function CartScreen() {
               variant="titleLarge"
               style={[styles.subtotal, { color: theme.colors.starbucksGreen }]}
             >
-              {formatCurrency(item.price * item.quantity)}
+              {formatCurrency(getItemUnitPrice(item) * item.quantity)}
             </Text>
           </View>
         </View>
       </View>
+    </Surface>
+  );
+
+  const Section = ({ title, icon, children }) => (
+    <Surface style={styles.sectionCard} elevation={2}>
+      <View style={styles.sectionHeader}>
+        {icon ? (
+          <MaterialCommunityIcons
+            name={icon}
+            size={20}
+            color={theme.colors.starbucksGreen}
+          />
+        ) : null}
+        <Text
+          variant="titleMedium"
+          style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
+        >
+          {title}
+        </Text>
+      </View>
+      {children}
     </Surface>
   );
 
@@ -272,113 +319,105 @@ export default function CartScreen() {
       ) : (
         <View style={styles.content}>
           <ScrollView
-            style={styles.itemsList}
+            style={styles.scroll}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 28 + (overlayHeight || 0) },
+            ]}
+            onScroll={(e) => {
+              const { contentOffset, layoutMeasurement, contentSize } =
+                e.nativeEvent;
+              const isBottom =
+                contentOffset.y + layoutMeasurement.height >=
+                contentSize.height - 1;
+              setShowSummary(isBottom);
+            }}
+            scrollEventThrottle={16}
           >
-            <View style={styles.itemsHeader}>
-              <MaterialCommunityIcons
-                name="format-list-bulleted"
-                size={20}
-                color={theme.colors.starbucksGreen}
+
+            <Section title="Danh sách đồ uống" icon="format-list-bulleted">
+              {items.map(renderCartItem)}
+            </Section>
+
+            {/* Address section renders its own header/card, avoid duplicate title */}
+            <ShippingAddressSection address={selectedAddress} />
+
+            <Section title="Phương thức thanh toán" icon="credit-card-outline">
+              <PaymentMethodSelector
+                value={paymentMethod}
+                onChange={setPaymentMethod}
               />
-              <Text
-                variant="titleMedium"
-                style={[styles.itemsTitle, { color: theme.colors.onSurface }]}
-              >
-                Danh sách đồ uống
-              </Text>
-            </View>
-            {items.map(renderCartItem)}
+            </Section>
+
+            <Section title="Ghi chú cho đơn hàng" icon="note-text-outline">
+              <TextInput
+                mode="outlined"
+                placeholder="Nếu có..."
+                value={orderNote}
+                onChangeText={setOrderNote}
+                multiline
+                numberOfLines={3}
+                style={{ backgroundColor: 'transparent' }}
+                outlineStyle={{ borderRadius: 12 }}
+                maxLength={200}
+                right={<TextInput.Affix text={`${orderNote.length}/200`} />}
+              />
+            </Section>
+            {/* Summary overlay được render bên ngoài ScrollView */}
           </ScrollView>
-
-          {/* Starbucks-style Summary */}
-          <Surface style={styles.summaryCard} elevation={6}>
-            <LinearGradient
-              colors={[theme.colors.surface, theme.colors.primaryContainer]}
-              style={styles.summaryGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+          {showSummary && (
+            <Surface
+              style={styles.summaryOverlay}
+              elevation={10}
+              onLayout={(e) => setOverlayHeight(e.nativeEvent.layout.height)}
             >
-              <View style={styles.summaryHeader}>
-                <MaterialCommunityIcons
-                  name="receipt"
-                  size={28}
-                  color={theme.colors.starbucksGreen}
-                />
-                <Text
-                  variant="titleLarge"
-                  style={[
-                    styles.summaryTitle,
-                    { color: theme.colors.starbucksGreen },
-                  ]}
-                >
-                  Tổng đơn hàng
-                </Text>
-              </View>
-
-              <Divider style={styles.divider} />
-
-              <View style={styles.summaryDetails}>
-                <View style={styles.summaryRow}>
-                  <Text
-                    variant="bodyLarge"
-                    style={[
-                      styles.summaryLabel,
-                      { color: theme.colors.onSurface },
-                    ]}
-                  >
-                    Số lượng món
-                  </Text>
-                  <Text
-                    variant="titleMedium"
-                    style={[
-                      styles.summaryValue,
-                      { color: theme.colors.onSurface },
-                    ]}
-                  >
-                    {getTotalItems()} ly
-                  </Text>
+              <LinearGradient
+                colors={[theme.colors.surface, theme.colors.primaryContainer]}
+                style={styles.summaryGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.summaryDetails}>
+                  <View style={styles.summaryRow}>
+                    <Text
+                      variant="titleLarge"
+                      style={[
+                        styles.totalLabel,
+                        { color: theme.colors.starbucksGreen },
+                      ]}
+                    >
+                      Tổng thanh toán
+                    </Text>
+                    <Text
+                      variant="headlineSmall"
+                      style={[
+                        styles.totalAmount,
+                        { color: theme.colors.starbucksGreen },
+                      ]}
+                    >
+                      {formatCurrency(getTotalPrice())}
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.summaryRow}>
-                  <Text
-                    variant="titleLarge"
+                <Surface style={styles.checkoutButtonContainer} elevation={2}>
+                  <Button
+                    mode="contained"
+                    onPress={handleCheckout}
                     style={[
-                      styles.totalLabel,
-                      { color: theme.colors.starbucksGreen },
+                      styles.checkoutButton,
+                      { backgroundColor: theme.colors.starbucksGreen },
                     ]}
+                    labelStyle={styles.checkoutButtonLabel}
+                    icon="credit-card"
                   >
-                    Tổng thanh toán
-                  </Text>
-                  <Text
-                    variant="headlineSmall"
-                    style={[
-                      styles.totalAmount,
-                      { color: theme.colors.starbucksGreen },
-                    ]}
-                  >
-                    {formatCurrency(getTotalPrice())}
-                  </Text>
-                </View>
-              </View>
-
-              <Surface style={styles.checkoutButtonContainer} elevation={2}>
-                <Button
-                  mode="contained"
-                  onPress={handleCheckout}
-                  style={[
-                    styles.checkoutButton,
-                    { backgroundColor: theme.colors.starbucksGreen },
-                  ]}
-                  labelStyle={styles.checkoutButtonLabel}
-                  icon="credit-card"
-                >
-                  Thanh toán ngay
-                </Button>
-              </Surface>
-            </LinearGradient>
-          </Surface>
+                    Thanh toán ngay
+                  </Button>
+                </Surface>
+              </LinearGradient>
+            </Surface>
+          )}
         </View>
       )}
     </View>
@@ -458,14 +497,33 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     backgroundColor: '#FFFFFF',
+    position: 'relative',
   },
-  itemsList: {
+  scroll: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   scrollContent: {
     paddingTop: 20,
-    paddingBottom: 20,
+    paddingBottom: 28,
+    paddingHorizontal: 20,
+  },
+  scrollContentWithOverlay: {
+    paddingBottom: 160, // để tránh overlay che nội dung khi hiện
+  },
+  sectionCard: {
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 16,
+    padding: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    marginLeft: 8,
   },
   itemsHeader: {
     flexDirection: 'row',
@@ -579,6 +637,15 @@ const styles = StyleSheet.create({
     margin: 20,
     marginTop: 0,
     borderRadius: 20,
+    overflow: 'hidden',
+  },
+  summaryOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     overflow: 'hidden',
   },
   summaryGradient: {

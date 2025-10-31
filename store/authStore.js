@@ -8,12 +8,21 @@ import {
   getAccessToken,
   getUserData,
 } from '../utils/auth';
+import { updateAddress } from '../api/addressesApi';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   loading: false,
 
+  fetchUser: async () => {
+    try {
+      const userData = await getUserData();
+      set({ user: userData });
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  },
   checkAuthState: async () => {
     try {
       const token = await getAccessToken();
@@ -147,6 +156,13 @@ export const useAuthStore = create((set, get) => ({
       throw error;
     }
   },
+  updateAddress: async (id, addressData) => {
+    set({ loading: true });
+    try {
+      const response = await updateAddress(id, addressData);
+      // After updating the address, fetch the latest user data
+      if (response) await setUserData(response);
+      set({ user: response, loading: false });
 
   loginWithGoogle: async (googleData) => {
     set({ loading: true });
@@ -198,7 +214,7 @@ export const useAuthStore = create((set, get) => ({
       throw error;
     }
   },
-
+    
   logout: async () => {
     try {
       await clearAuth();
