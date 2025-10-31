@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,41 +12,45 @@ import {
 import { TextInput, Text, Surface } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import LoadingIndicator from '../../components/LoadingIndicator';
+import * as authApi from '../../api/authApi';
 
-export default function RegisterScreen() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
+export default function ResetPasswordScreen() {
+  const params = useLocalSearchParams();
+  const email = params?.email ?? '';
+  const otp = params?.otp ?? '';
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { register } = useAuthStore();
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleRegister = async () => {
-    const { name, email, phone, password, confirmPassword } = formData;
-
-    if (!name || !email || !phone || !password || !confirmPassword) {
+  useEffect(() => {
+    // Validate that we have required params
+    if (!email || !otp) {
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
-        text2: 'Vui lòng điền đầy đủ thông tin',
+        text2: 'Thông tin không hợp lệ. Vui lòng thử lại.',
+      });
+      router.replace('/auth/login');
+    }
+  }, [email, otp]);
+
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi',
+        text2: 'Vui lòng nhập đầy đủ thông tin',
       });
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
@@ -55,7 +59,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
+    if (newPassword.length < 6) {
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
@@ -64,35 +68,31 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Validate phone number (basic validation)
-    const phoneRegex = /^[0-9]{10,11}$/;
-    if (!phoneRegex.test(phone)) {
-      Toast.show({
-        type: 'error',
-        text1: 'Lỗi',
-        text2: 'Số điện thoại không hợp lệ (10-11 chữ số)',
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      await register({ name, email, phone, password });
+      // Call resetPassword API with email, otp, and new password
+      await authApi.resetPassword({
+        email,
+        password: newPassword,
+      });
+
       Toast.show({
         type: 'success',
         text1: 'Thành công',
-        text2: 'Đăng ký thành công! Vui lòng xác thực OTP.',
+        text2: 'Đổi mật khẩu thành công. Vui lòng đăng nhập.',
       });
-      // Navigate to OTP verification. Pass register data so verify screen can include needed fields.
-      router.push({
-        pathname: '/auth/verify-otp',
-        params: { flow: 'register', name, email, phone, password },
-      });
+
+      // Navigate to login after successful password reset
+      router.replace('/auth/login');
     } catch (error) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Đổi mật khẩu thất bại';
       Toast.show({
         type: 'error',
         text1: 'Lỗi',
-        text2: error.message || 'Đăng ký thất bại',
+        text2: msg,
       });
     } finally {
       setLoading(false);
@@ -128,13 +128,10 @@ export default function RegisterScreen() {
                 />
               </Surface>
               <Text variant="headlineMedium" style={styles.title}>
-                Sign Up
+                Đặt lại mật khẩu
               </Text>
               <Text variant="bodyMedium" style={styles.subtitle}>
-                Sign up now for free and start
-              </Text>
-              <Text variant="bodyMedium" style={styles.subtitle}>
-                meditating, and explore Medic.
+                Nhập mật khẩu mới của bạn
               </Text>
             </View>
 
@@ -142,18 +139,16 @@ export default function RegisterScreen() {
             <View style={styles.form}>
               <View style={styles.inputGroup}>
                 <Text variant="bodySmall" style={styles.inputLabel}>
-                  Name
+                  Email
                 </Text>
                 <TextInput
-                  value={formData.name}
-                  onChangeText={(value) => handleInputChange('name', value)}
+                  value={email}
                   mode="flat"
-                  autoCapitalize="words"
+                  disabled
                   style={styles.input}
                   underlineColor="transparent"
                   activeUnderlineColor="#8BA99E"
                   textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
                   theme={{
                     colors: {
                       onSurfaceVariant: 'rgba(255,255,255,0.5)',
@@ -164,59 +159,14 @@ export default function RegisterScreen() {
 
               <View style={styles.inputGroup}>
                 <Text variant="bodySmall" style={styles.inputLabel}>
-                  Email Address
+                  Mật khẩu mới
                 </Text>
                 <TextInput
-                  value={formData.email}
-                  onChangeText={(value) => handleInputChange('email', value)}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
                   mode="flat"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  style={styles.input}
-                  underlineColor="transparent"
-                  activeUnderlineColor="#8BA99E"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  theme={{
-                    colors: {
-                      onSurfaceVariant: 'rgba(255,255,255,0.5)',
-                    },
-                  }}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text variant="bodySmall" style={styles.inputLabel}>
-                  Phone Number
-                </Text>
-                <TextInput
-                  value={formData.phone}
-                  onChangeText={(value) => handleInputChange('phone', value)}
-                  mode="flat"
-                  keyboardType="phone-pad"
-                  placeholder="0123456789"
-                  style={styles.input}
-                  underlineColor="transparent"
-                  activeUnderlineColor="#8BA99E"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  theme={{
-                    colors: {
-                      onSurfaceVariant: 'rgba(255,255,255,0.5)',
-                    },
-                  }}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text variant="bodySmall" style={styles.inputLabel}>
-                  Password
-                </Text>
-                <TextInput
-                  value={formData.password}
-                  onChangeText={(value) => handleInputChange('password', value)}
-                  mode="flat"
-                  secureTextEntry={!showPassword}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Nhập mật khẩu mới"
                   style={styles.input}
                   underlineColor="transparent"
                   activeUnderlineColor="#8BA99E"
@@ -224,8 +174,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="rgba(255,255,255,0.5)"
                   right={
                     <TextInput.Icon
-                      icon={showPassword ? 'eye-off' : 'eye'}
-                      onPress={() => setShowPassword(!showPassword)}
+                      icon={showNewPassword ? 'eye-off' : 'eye'}
+                      onPress={() => setShowNewPassword(!showNewPassword)}
                       iconColor="rgba(255,255,255,0.7)"
                     />
                   }
@@ -239,15 +189,14 @@ export default function RegisterScreen() {
 
               <View style={styles.inputGroup}>
                 <Text variant="bodySmall" style={styles.inputLabel}>
-                  Confirm Password
+                  Xác nhận mật khẩu
                 </Text>
                 <TextInput
-                  value={formData.confirmPassword}
-                  onChangeText={(value) =>
-                    handleInputChange('confirmPassword', value)
-                  }
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
                   mode="flat"
                   secureTextEntry={!showConfirmPassword}
+                  placeholder="Nhập lại mật khẩu mới"
                   style={styles.input}
                   underlineColor="transparent"
                   activeUnderlineColor="#8BA99E"
@@ -270,32 +219,29 @@ export default function RegisterScreen() {
                 />
               </View>
 
-              {/* Signup Button */}
+              {/* Reset Button */}
               <TouchableOpacity
-                onPress={handleRegister}
+                onPress={handleResetPassword}
                 disabled={loading}
                 activeOpacity={0.8}
-                style={styles.signupButtonWrapper}
+                style={styles.resetButtonWrapper}
               >
-                <Surface style={styles.signupButton} elevation={3}>
+                <Surface style={styles.resetButton} elevation={3}>
                   {loading ? (
                     <LoadingIndicator type="wave" size={28} color="#2F4F4F" />
                   ) : (
-                    <Text variant="titleMedium" style={styles.signupButtonText}>
-                      SIGNUP
+                    <Text variant="titleMedium" style={styles.resetButtonText}>
+                      ĐỔI MẬT KHẨU
                     </Text>
                   )}
                 </Surface>
               </TouchableOpacity>
 
-              {/* Sign In Link */}
-              <View style={styles.signinRow}>
-                <Text variant="bodyMedium" style={styles.signinText}>
-                  Already have an account?{' '}
-                </Text>
+              {/* Back to Login Link */}
+              <View style={styles.loginRow}>
                 <TouchableOpacity onPress={() => router.push('/auth/login')}>
-                  <Text variant="bodyMedium" style={styles.signinLink}>
-                    Sign In
+                  <Text variant="bodyMedium" style={styles.loginLink}>
+                    Quay lại đăng nhập
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -376,30 +322,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.3)',
   },
-  signupButtonWrapper: {
+  resetButtonWrapper: {
     marginTop: 10,
     marginBottom: 20,
   },
-  signupButton: {
+  resetButton: {
     backgroundColor: '#8BA99E',
     borderRadius: 12,
     paddingVertical: 16,
   },
-  signupButtonText: {
+  resetButtonText: {
     color: '#2F4F4F',
     textAlign: 'center',
     fontWeight: 'bold',
     letterSpacing: 1,
   },
-  signinRow: {
+  loginRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  signinText: {
-    color: 'rgba(255,255,255,0.8)',
-  },
-  signinLink: {
+  loginLink: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },

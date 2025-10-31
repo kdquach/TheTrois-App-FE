@@ -307,6 +307,11 @@ export default function ProfileScreen() {
           onPress: () => setEditDialogVisible(true),
         },
         {
+          title: 'Sổ địa chỉ',
+          icon: 'map-marker-outline',
+          onPress: () => router.push('/addresses'),
+        },
+        {
           title: 'Đổi mật khẩu',
           icon: 'lock-reset',
           onPress: () => setChangePasswordDialogVisible(true),

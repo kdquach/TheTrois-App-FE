@@ -8,12 +8,21 @@ import {
   getAccessToken,
   getUserData,
 } from '../utils/auth';
+import { updateAddress } from '../api/addressesApi';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   loading: false,
 
+  fetchUser: async () => {
+    try {
+      const userData = await getUserData();
+      set({ user: userData });
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  },
   checkAuthState: async () => {
     try {
       const token = await getAccessToken();
@@ -83,6 +92,8 @@ export const useAuthStore = create((set, get) => ({
   register: async (userData) => {
     set({ loading: true });
     try {
+      console.log(userData);
+
       const response = await authApi.register(userData);
 
       const maybe = (obj, path) =>
@@ -149,7 +160,65 @@ export const useAuthStore = create((set, get) => ({
       throw error;
     }
   },
+  updateAddress: async (id, addressData) => {
+    set({ loading: true });
+    try {
+      const response = await updateAddress(id, addressData);
+      // After updating the address, fetch the latest user data
+      if (response) await setUserData(response);
+      set({ user: response, loading: false });
 
+  loginWithGoogle: async (googleData) => {
+    set({ loading: true });
+    try {
+      const response = await authApi.loginWithGoogle(googleData);
+
+      const maybe = (obj, path) =>
+        path.split('.').reduce((acc, k) => acc && acc[k], obj);
+
+      const tokenCandidates = [
+        response?.access_token,
+        response?.accessToken,
+        response?.token,
+        maybe(response, 'tokens.access'),
+        maybe(response, 'data.access_token'),
+        maybe(response, 'data.accessToken'),
+        maybe(response, 'data.token'),
+        maybe(response, 'data.tokens.access'),
+      ];
+
+      let token =
+        tokenCandidates.find((t) => t !== undefined && t !== null) || null;
+
+      if (token && typeof token === 'object') {
+        token = token.token || token.access || token.value || null;
+      }
+
+      const user =
+        response?.user ||
+        maybe(response, 'data.user') ||
+        maybe(response, 'data') ||
+        null;
+
+      if (token) {
+        const tokenStr = typeof token === 'string' ? token : String(token);
+        await setAccessToken(tokenStr);
+        set({ token: tokenStr });
+      }
+
+      if (user) {
+        await setUserData(user);
+        set({ user });
+      }
+
+      set({ loading: false });
+      return response;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
+    
   logout: async () => {
     try {
       await clearAuth();
