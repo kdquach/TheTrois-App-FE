@@ -7,13 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const METHODS = [
     {
-        key: 'cod',
+        key: 'cash',
         title: 'Thanh toán khi nhận hàng',
         description: 'Trả tiền mặt (COD) khi nhận hàng',
         icon: 'cash-multiple',
     },
     {
-        key: 'vnpay',
+        key: 'card',
         title: 'VNPay',
         description: 'Thanh toán trực tuyến qua VNPay',
         icon: 'bank-transfer',
