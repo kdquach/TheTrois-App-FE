@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react';
 import PaymentMethodSelector from '../checkout/PaymentMethodSelector';
 import { useAuthStore } from '../../store/authStore';
 import { useAddressStore } from '../../store/addressStore';
+import { useOrderStore } from '../../store/orderStore';
 
 const { width } = Dimensions.get('window');
 
@@ -39,8 +40,9 @@ export default function CartScreen() {
   } = useCartStore();
   const { user, logout, updateProfile, fetchUser } = useAuthStore();
   const { selectedAddress, setSelectedAddress } = useAddressStore();
+  const { createOrder } = useOrderStore();
 
-  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [showSummary, setShowSummary] = useState(false);
   const [overlayHeight, setOverlayHeight] = useState(0);
   const [orderNote, setOrderNote] = useState('');
@@ -62,7 +64,7 @@ export default function CartScreen() {
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (items.length === 0) {
       Toast.show({
         type: 'warning',
@@ -71,20 +73,48 @@ export default function CartScreen() {
       });
       return;
     }
-
-    Toast.show({
-      type: 'success',
-      text1: 'Đặt hàng thành công',
-      text2: 'Đơn hàng của bạn đang được xử lý',
+    const orderAddress = [
+      selectedAddress?.street,
+      selectedAddress?.ward?.name,
+      selectedAddress?.district?.name,
+      selectedAddress?.city?.name,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const products = items?.map(item => {
+      return {
+        productId: item.id,
+        name: item.name,
+        price: item.finalPrice || item.price,
+        quantity: item.quantity,
+        toppings: item.toppingsInfo?.map(t => ({ toppingId: t.id, name: t.name, price: t.price })) || [],
+        customization: item.customization?.description || null,
+      };
     });
-    clearCart();
+
+    const payload = {
+      shippingAddress: orderAddress,
+      products: products,
+      totalAmount: getTotalPrice(),
+      note: orderNote,
+      payment: {
+        method: paymentMethod,
+      },
+    };
+
+    const res = await createOrder(payload)
+    if (res?.success) {
+      Toast.show({
+        type: 'success',
+        text1: 'Đặt hàng thành công',
+        text2: 'Đơn hàng của bạn đang được xử lý',
+      });
+      clearCart();
+    }
   };
 
   const getItemUnitPrice = (item) => {
-    const toppingsPrice = item.toppings
-      ? item.toppings.reduce((sum, t) => sum + (t.price || 0), 0)
-      : 0;
-    return (item.price || 0) + toppingsPrice;
+    return item.quantity * (item.finalPrice || item.price || 0);
   };
 
 
@@ -140,33 +170,33 @@ export default function CartScreen() {
             variant="bodyMedium"
             style={[styles.itemPrice, { color: theme.colors.starbucksGreen }]}
           >
-            {formatCurrency(getItemUnitPrice(item))} / ly
+            {formatCurrency(item.price)} / ly
           </Text>
 
-          {item.toppings && item.toppings.length > 0 && (
-            <Surface style={styles.toppingsContainer} elevation={1}>
-              <Text
-                variant="bodySmall"
-                style={[
-                  styles.toppingsLabel,
-                  { color: theme.colors.onSurface },
-                ]}
-              >
-                🧊 Topping
-              </Text>
-              <View style={styles.toppingsChips}>
-                {item.toppings.map((topping, index) => (
-                  <Chip
-                    key={index}
-                    compact
-                    style={styles.toppingChip}
-                    textStyle={styles.toppingChipText}
-                  >
-                    {topping.name}  +{formatCurrency(topping.price)}
-                  </Chip>
-                ))}
-              </View>
-            </Surface>
+          {item.toppingsInfo && item.toppingsInfo.length > 0 && (
+            <View style={styles.toppingsList}>
+              {item.toppingsInfo.map((t, idx) => (
+                <Text
+                  key={idx}
+                  variant="labelSmall"
+                  style={[styles.toppingLine, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
+                  numberOfLines={1}
+                >
+                  {t.name} +{formatCurrency(t.price || 0)}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {/* Customization single line below toppings */}
+          {(item.customization?.description) && (
+            <Text
+              variant="labelSmall"
+              style={[styles.customizationText, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
+              numberOfLines={1}
+            >
+              {item.customization?.description}
+            </Text>
           )}
 
           <View style={styles.quantityAndTotal}>
@@ -197,7 +227,7 @@ export default function CartScreen() {
               variant="titleLarge"
               style={[styles.subtotal, { color: theme.colors.starbucksGreen }]}
             >
-              {formatCurrency(getItemUnitPrice(item) * item.quantity)}
+              {formatCurrency(getItemUnitPrice(item))}
             </Text>
           </View>
         </View>
@@ -475,10 +505,12 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 32,
+    lineHeight: 16,
+    fontSize: 12,
   },
   shopButtonContainer: {
-    borderRadius: 25,
+    marginTop: 2,
+    fontSize: 12,
     overflow: 'hidden',
   },
   shopButton: {
@@ -588,6 +620,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
     fontSize: 15,
+  },
+  toppingsInlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  toppingsInlineText: {
+    flex: 1,
+  },
+  customizationText: {
+    marginTop: 2,
+  },
+  toppingsList: {
+    marginTop: 2,
+    gap: 2,
+  },
+  toppingLine: {
+    lineHeight: 18,
+  },
+  toppingsLabelText: {
+    fontWeight: '600',
+  },
+  toppingsPrice: {
+    fontWeight: '600',
+  },
+  toppingsMore: {
+    fontStyle: 'italic',
+  },
+  customizationLabel: {
+    fontStyle: 'italic',
   },
   toppingsContainer: {
     marginBottom: 14,

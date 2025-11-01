@@ -125,6 +125,20 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const getToppingsInfo = () => {
+    return selectedToppings.map((toppingId) => {
+      const topping = productToppings.find(
+
+        (t) => (t.id || t._id) === toppingId
+      );
+      return {
+        id: topping?.id || topping?._id || 'Unknown',
+        name: topping?.name || 'Unknown',
+        price: topping?.price || 0,
+      };
+    });
+  }
+
   const calculateTotalPrice = () => {
     let total = product.price;
     const sizeExtra = SIZES.find((s) => s.id === selectedSize)?.price || 0;
@@ -166,6 +180,7 @@ export default function ProductDetailScreen() {
       toppings: selectedToppings, // Store topping IDs
       quantity,
       finalPrice: calculateTotalPrice(),
+      toppingsInfo: getToppingsInfo(),
     };
 
     console.log('Adding to cart:', cartItem);

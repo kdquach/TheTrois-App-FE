@@ -5,28 +5,33 @@ export const useCartStore = create((set, get) => ({
 
   addToCart: (product, toppings = []) => {
     const { items } = get();
-    const existingItem = items.find(item => 
-      item.id === product.id && 
+    const existingItem = items.find(item =>
+      item.id === product.id &&
       JSON.stringify(item.toppings) === JSON.stringify(toppings)
     );
 
     if (existingItem) {
       set({
         items: items.map(item =>
-          item.id === existingItem.id && 
-          JSON.stringify(item.toppings) === JSON.stringify(existingItem.toppings)
+          item.id === existingItem.id &&
+            JSON.stringify(item.toppings) === JSON.stringify(existingItem.toppings)
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
       });
     } else {
+      // Nếu chưa có thì thêm mới
       const newItem = {
         id: product.id,
         name: product.name,
-        price: product.price,
         image: product.image,
-        quantity: 1,
-        toppings: toppings
+        price: product.price,
+        finalPrice: product.finalPrice,
+        size: product.size,
+        toppings: product.toppings || [],
+        customization: product.customization || null,
+        quantity: product.quantity || 1,
+        toppingsInfo: product.toppingsInfo || [],
       };
       set({ items: [...items, newItem] });
     }
@@ -64,9 +69,9 @@ export const useCartStore = create((set, get) => ({
   getTotalPrice: () => {
     const { items } = get();
     return items.reduce((total, item) => {
-      const toppingsPrice = item.toppings ? 
-        item.toppings.reduce((sum, topping) => sum + topping.price, 0) : 0;
-      return total + (item.price + toppingsPrice) * item.quantity;
+      const toppingsPrice = item.toppingsInfo ?
+        item.toppingsInfo.reduce((sum, topping) => sum + topping.price, 0) : 0;
+      return total + (item.finalPrice || item.price + toppingsPrice) * item.quantity;
     }, 0);
   },
 }));
