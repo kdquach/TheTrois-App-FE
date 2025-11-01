@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { mockOrderAPI } from '../api/mockOrders';
-import { createOrder, getOrders } from '../api/orderApi';
+import { createOrder, getOrders, updateOrderStatus } from '../api/orderApi';
 import { getOrderData, setOrderData } from '../utils/order';
 
 export const useOrderStore = create((set, get) => ({
@@ -29,12 +29,7 @@ export const useOrderStore = create((set, get) => ({
     set({ loading: true });
     try {
       const newOrder = await createOrder(orderData);
-      // const { orders } = get();
-      // set({
-      //   orders: [newOrder.data, ...orders],
-      //   loading: false
-      // });
-      // console.log("🚀 ~ orders:", orders)
+      set({ loading: false });
       return newOrder;
     } catch (error) {
       set({ loading: false });
@@ -43,16 +38,19 @@ export const useOrderStore = create((set, get) => ({
   },
 
   updateOrderStatus: async (orderId, status) => {
+    set({ loading: true });
     try {
-      const updatedOrder = await mockOrderAPI.updateOrderStatus(orderId, status);
+      const updatedOrder = await updateOrderStatus(orderId, status);
       const { orders } = get();
       set({
         orders: orders.map(order =>
           order.id === orderId ? updatedOrder : order
         )
       });
+      set({ loading: false });
       return updatedOrder;
     } catch (error) {
+      set({ loading: false });
       throw error;
     }
   },

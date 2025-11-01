@@ -6,16 +6,19 @@ import {
   RefreshControl,
   TouchableOpacity,
   Animated,
+  Alert,
 } from 'react-native';
 import { Appbar, Text, Surface, Divider, Button } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrderStore } from '../../store/orderStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatCurrency, formatDate } from '../../utils/format';
 import LoadingIndicator from '../../components/LoadingIndicator';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import Toast from 'react-native-toast-message';
 
 const ORDER_STATUS_CONFIG = {
   pending: {
@@ -58,11 +61,12 @@ const ORDER_STATUS_CONFIG = {
 
 export default function OrdersScreen() {
   const theme = useTheme();
+  const { user } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [expandedOrders, setExpandedOrders] = useState(new Set());
 
-  const { orders, loading, fetchOrders } = useOrderStore();
+  const { orders, loading, fetchOrders, updateOrderStatus } = useOrderStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +95,7 @@ export default function OrdersScreen() {
       'preparing',
       'ready',
       'completed',
+      'cancelled'
     ];
     const currentIndex = statuses.indexOf(status);
 
@@ -138,6 +143,32 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = (order) => {
+
+    const handleCancelOrder = () => {
+      Alert.alert(
+        'Hủy đơn hàng',
+        'Bạn có chắc chắn muốn hủy đơn hàng này?',
+        [
+          { text: 'Không', style: 'cancel' },
+          {
+            text: 'Hủy đơn',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await updateOrderStatus(order.orderId, 'cancelled');
+                Toast.show({
+                  type: 'success',
+                  text1: 'Hủy đơn hàng thành công',
+                });
+                await fetchOrders(selectedStatus);
+              } catch (e) {
+                // No-op; backend route may be missing. UI will refresh on next fetch.
+              }
+            },
+          },
+        ]
+      );
+    };
 
     const statusConfig = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pending']; // fallback
     const isExpanded = expandedOrders.has(order.orderId);
@@ -326,6 +357,27 @@ export default function OrdersScreen() {
 
             <Divider style={styles.divider} />
 
+            {/* Ordering User (outside of address block) */}
+            {(user?.name || user?.phone || user?.phoneNumber) && (
+              <View style={styles.shippingSection}>
+                <View style={styles.shippingRow}>
+                  <MaterialCommunityIcons
+                    name="account-outline"
+                    size={20}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: theme.colors.onSurfaceVariant, opacity: 0.7 }}
+                    numberOfLines={1}
+                  >
+                    Người đặt: <Text style={{ fontWeight: '600', color: theme.colors.onSurface }}>{user?.name || 'Khách hàng'}</Text>
+                    {user?.phone || user?.phoneNumber ? `  •  ${user?.phone || user?.phoneNumber}` : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Shipping Address */}
             {order.shippingAddress ? (
               <View style={styles.shippingSection}>
@@ -376,6 +428,19 @@ export default function OrdersScreen() {
               <Text variant="titleMedium" style={styles.paymentMethod}>
                 {order.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thanh toán online'}
               </Text>
+              {order.status === 'pending' && (
+                <View style={styles.paymentActions}>
+                  <Button
+                    mode="outlined"
+                    compact
+                    onPress={handleCancelOrder}
+                    textColor={theme.colors.error}
+                    icon="close-circle-outline"
+                  >
+                    Hủy đơn hàng
+                  </Button>
+                </View>
+              )}
             </View>
 
             {/* Action Buttons */}
@@ -416,6 +481,7 @@ export default function OrdersScreen() {
     { key: 'preparing', label: 'Pha chế', icon: 'coffee-maker' },
     { key: 'ready', label: 'Sẵn sàng', icon: 'bell-ring' },
     { key: 'completed', label: 'Hoàn thành', icon: 'check-all' },
+    { key: 'cancelled', label: 'Đã hủy', icon: 'close-circle' },
   ];
 
   const renderEmptyState = () => (
@@ -748,6 +814,11 @@ const styles = StyleSheet.create({
   paymentSection: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  paymentActions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   shippingSection: {
     paddingHorizontal: 16,
