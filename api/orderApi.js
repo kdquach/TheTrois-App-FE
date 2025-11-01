@@ -25,7 +25,7 @@ export const createOrder = async (orderData) => {
 
 export const updateOrderStatus = async (orderId, status) => {
     try {
-        const data = await apiClient.patch(`/orders/${orderId}/status`, { status });
+        const data = await apiClient.patch(`/orders/${orderId}/${status}`);
         return data;
     } catch (error) {
         // caller can handle the error
