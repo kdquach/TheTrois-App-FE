@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Image, Dimensions } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Image,
+  Dimensions,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import {
   Text,
   Button,
@@ -11,6 +19,7 @@ import {
   IconButton,
 } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
+import { Stack, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -490,6 +499,25 @@ export default function ProductDetailScreen() {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
+      {/* Feedback */}
+      <View style={styles.reviewSection}>
+        <Link
+          // Điều hướng đến màn hình Feedback List, truyền Product ID qua query
+          // PHẢI ĐẢM BẢO THƯ MỤC app/feedback/[id].js TỒN TẠI
+          href={{
+            pathname: `/feedback/${id}`,
+            params: { productId: id, productName: product.name },
+          }}
+          asChild
+        >
+          <TouchableOpacity style={styles.reviewButton}>
+            <Text style={styles.reviewButtonText}>
+              Xem Bình Luận ({product.reviewCount || 0})
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+
       {/* Bottom Bar */}
       <Surface style={styles.bottomBar} elevation={8}>
         <View style={styles.quantitySection}>
@@ -757,5 +785,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  reviewSection: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+  },
+  reviewButton: {
+    backgroundColor: '#137d5bff',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  reviewButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
