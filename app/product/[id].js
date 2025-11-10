@@ -128,7 +128,6 @@ export default function ProductDetailScreen() {
   const getToppingsInfo = () => {
     return selectedToppings.map((toppingId) => {
       const topping = productToppings.find(
-
         (t) => (t.id || t._id) === toppingId
       );
       return {
@@ -137,7 +136,7 @@ export default function ProductDetailScreen() {
         price: topping?.price || 0,
       };
     });
-  }
+  };
 
   const calculateTotalPrice = () => {
     let total = product.price;
@@ -163,38 +162,51 @@ export default function ProductDetailScreen() {
     );
   };
 
-  const handleAddToCart = () => {
-    setLoading(true);
+  const handleAddToCart = async () => {
+    try {
+      setLoading(true);
 
-    // Build customization object matching backend schema
-    const customization = {
-      ice: iceLevel,
-      sugar: sugarLevel,
-      description: `Size ${selectedSize}, ${iceLevel}% đá, ${sugarLevel}% đường`,
-    };
+      // Tạo customization đúng chuẩn backend
+      const customization = {
+        size: selectedSize,
+        ice: iceLevel,
+        sugar: sugarLevel,
+        description: `Size ${selectedSize}, ${iceLevel}% đá, ${sugarLevel}% đường`,
+      };
 
-    const cartItem = {
-      ...product,
-      size: selectedSize,
-      customization, // Store as object with ice/sugar numbers
-      toppings: selectedToppings, // Store topping IDs
-      quantity,
-      finalPrice: calculateTotalPrice(),
-      toppingsInfo: getToppingsInfo(),
-    };
+      // Định dạng topping theo chuẩn BE [{ toppingId, quantity }]
+      const toppingsPayload = selectedToppings.map((toppingId) => ({
+        toppingId,
+        quantity: 1,
+      }));
 
-    console.log('Adding to cart:', cartItem);
-    addToCart(cartItem);
+      const cartItem = {
+        productId: product.id || product._id,
+        quantity,
+        customization,
+        toppings: toppingsPayload,
+        note: '',
+      };
 
-    setTimeout(() => {
-      setLoading(false);
+      console.log('Sending cart item:', cartItem);
+
+      await addToCart(cartItem); // Gọi store để thêm
       Toast.show({
         type: 'success',
-        text1: 'Đã thêm vào giỏ hàng! 🎉',
+        text1: 'Đã thêm vào giỏ hàng!',
         text2: `${product.name} x${quantity}`,
       });
+
       router.back();
-    }, 500);
+    } catch (error) {
+      console.error('Lỗi thêm vào giỏ hàng:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Không thể thêm vào giỏ hàng',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -565,18 +577,15 @@ export default function ProductDetailScreen() {
             mode="contained"
             onPress={handleAddToCart}
             disabled={loading}
+            loading={loading} // ← Thêm prop này
             style={[
               styles.addToCartButton,
               { backgroundColor: theme.colors.starbucksGreen },
             ]}
             labelStyle={styles.addToCartLabel}
-            icon="cart-plus"
+            icon={loading ? undefined : 'cart-plus'} // Ẩn icon khi loading
           >
-            {loading ? (
-              <LoadingIndicator type="wave" size={24} color="#FFFFFF" />
-            ) : (
-              'Thêm vào giỏ'
-            )}
+            Thêm vào giỏ
           </Button>
         </View>
       </Surface>
