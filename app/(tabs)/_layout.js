@@ -6,8 +6,12 @@ import { useCartStore } from '../../store/cartStore';
 
 export default function TabLayout() {
   const theme = useTheme();
-  const { items } = useCartStore();
-  const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const { cart } = useCartStore();
+  const items = cart?.items || [];
+  const cartItemsCount = items.reduce(
+    (sum, item) => sum + (item.quantity || 0),
+    0
+  );
 
   return (
     <Tabs

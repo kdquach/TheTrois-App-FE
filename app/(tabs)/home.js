@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const { products, categories, loading, fetchProducts } = useProductStore();
-  const { addToCart } = useCartStore();
+  const { addToCart, loading: cartLoading } = useCartStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
 
   useEffect(() => {
@@ -61,7 +61,21 @@ export default function HomeScreen() {
   });
 
   const handleAddToCart = (product) => {
-    addToCart(product);
+    // Build a minimal payload for quick-add to avoid API 400 from unexpected shape
+    const payload = {
+      productId: product.id || product._id,
+      quantity: 1,
+      customization: {
+        size: 'S',
+        ice: 100,
+        sugar: 100,
+        description: '',
+      },
+      toppings: [],
+      note: '',
+    };
+
+    addToCart(payload);
     Toast.show({
       type: 'success',
       text1: 'Đã thêm vào giỏ hàng',
@@ -139,6 +153,7 @@ export default function HomeScreen() {
                 e.stopPropagation();
                 handleAddToCart(product);
               }}
+              disabled={cartLoading}
               style={[
                 styles.addButton,
                 { backgroundColor: theme.colors.starbucksGreen },
