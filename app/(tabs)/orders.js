@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrderStore } from '../../store/orderStore';
 import { useAuthStore } from '../../store/authStore';
+import { useCartStore } from '../../store/cartStore';
 import { formatCurrency, formatDate } from '../../utils/format';
 import LoadingIndicator from '../../components/LoadingIndicator';
 import { useFocusEffect } from '@react-navigation/native';
@@ -68,6 +69,7 @@ export default function OrdersScreen() {
   const [expandedOrders, setExpandedOrders] = useState(new Set());
 
   const { orders, loading, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { getItemTotalPrice } = useCartStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -96,7 +98,7 @@ export default function OrdersScreen() {
       'preparing',
       'ready',
       'completed',
-      'cancelled'
+      'cancelled',
     ];
     const currentIndex = statuses.indexOf(status);
 
@@ -144,34 +146,30 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = (order) => {
-
     const handleCancelOrder = () => {
-      Alert.alert(
-        'Hủy đơn hàng',
-        'Bạn có chắc chắn muốn hủy đơn hàng này?',
-        [
-          { text: 'Không', style: 'cancel' },
-          {
-            text: 'Hủy đơn',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await updateOrderStatus(order.orderId, 'cancelled');
-                Toast.show({
-                  type: 'success',
-                  text1: 'Hủy đơn hàng thành công',
-                });
-                await fetchOrders(selectedStatus);
-              } catch (e) {
-                // No-op; backend route may be missing. UI will refresh on next fetch.
-              }
-            },
+      Alert.alert('Hủy đơn hàng', 'Bạn có chắc chắn muốn hủy đơn hàng này?', [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateOrderStatus(order.orderId, 'cancelled');
+              Toast.show({
+                type: 'success',
+                text1: 'Hủy đơn hàng thành công',
+              });
+              await fetchOrders(selectedStatus);
+            } catch (e) {
+              // No-op; backend route may be missing. UI will refresh on next fetch.
+            }
           },
-        ]
-      );
+        },
+      ]);
     };
 
-    const statusConfig = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pending']; // fallback
+    const statusConfig =
+      ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pending']; // fallback
     const isExpanded = expandedOrders.has(order.orderId);
 
     return (
@@ -315,26 +313,39 @@ export default function OrdersScreen() {
                     >
                       {formatCurrency(item.unitPrice)} × {item.quantity}
                     </Text>
-                    {Array.isArray(item.toppings) && item.toppings.length > 0 && (
-                      <View style={styles.toppingsList}>
-                        {item.toppings.map((t, idx) => (
-                          <Text
-                            key={idx}
-                            variant="labelSmall"
-                            style={[styles.toppingLine, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
-                            numberOfLines={1}
-                          >
-                            {t.name} +{formatCurrency(t.price || 0)}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
+                    {Array.isArray(item.toppings) &&
+                      item.toppings.length > 0 && (
+                        <View style={styles.toppingsList}>
+                          {item.toppings.map((t, idx) => (
+                            <Text
+                              key={idx}
+                              variant="labelSmall"
+                              style={[
+                                styles.toppingLine,
+                                {
+                                  color: theme.colors.onSurfaceVariant,
+                                  opacity: 0.6,
+                                },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {t.name} +{formatCurrency(t.price || 0)}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
 
                     {/* Customization single line below toppings */}
                     {item.customization && (
                       <Text
                         variant="labelSmall"
-                        style={[styles.customizationText, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
+                        style={[
+                          styles.customizationText,
+                          {
+                            color: theme.colors.onSurfaceVariant,
+                            opacity: 0.6,
+                          },
+                        ]}
                         numberOfLines={1}
                       >
                         {typeof item.customization === 'string'
@@ -350,7 +361,7 @@ export default function OrdersScreen() {
                       { color: theme.colors.starbucksGreen },
                     ]}
                   >
-                    {formatCurrency(item.unitPrice * item.quantity)}
+                    {formatCurrency(getItemTotalPrice(item))}
                   </Text>
                 </View>
               ))}
@@ -369,11 +380,24 @@ export default function OrdersScreen() {
                   />
                   <Text
                     variant="labelSmall"
-                    style={{ color: theme.colors.onSurfaceVariant, opacity: 0.7 }}
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      opacity: 0.7,
+                    }}
                     numberOfLines={1}
                   >
-                    Người đặt: <Text style={{ fontWeight: '600', color: theme.colors.onSurface }}>{user?.name || 'Khách hàng'}</Text>
-                    {user?.phone || user?.phoneNumber ? `  •  ${user?.phone || user?.phoneNumber}` : ''}
+                    Người đặt:{' '}
+                    <Text
+                      style={{
+                        fontWeight: '600',
+                        color: theme.colors.onSurface,
+                      }}
+                    >
+                      {user?.name || 'Khách hàng'}
+                    </Text>
+                    {user?.phone || user?.phoneNumber
+                      ? `  •  ${user?.phone || user?.phoneNumber}`
+                      : ''}
                   </Text>
                 </View>
               </View>
@@ -400,7 +424,10 @@ export default function OrdersScreen() {
                 </View>
                 <Text
                   variant="bodySmall"
-                  style={[styles.shippingAddress, { color: theme.colors.onSurfaceVariant, opacity: 0.85 }]}
+                  style={[
+                    styles.shippingAddress,
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.85 },
+                  ]}
                   numberOfLines={2}
                 >
                   {order.shippingAddress}
@@ -427,7 +454,9 @@ export default function OrdersScreen() {
                 </Text>
               </View>
               <Text variant="titleMedium" style={styles.paymentMethod}>
-                {order.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thanh toán online'}
+                {order.paymentMethod === 'cash'
+                  ? 'Tiền mặt'
+                  : 'Thanh toán online'}
               </Text>
               {order.status === 'pending' && (
                 <View style={styles.paymentActions}>
@@ -631,8 +660,8 @@ export default function OrdersScreen() {
         {filteredOrders.length === 0
           ? renderEmptyState()
           : filteredOrders.map((order) => {
-            return renderOrderItem(order);
-          })}
+              return renderOrderItem(order);
+            })}
       </ScrollView>
     </View>
   );

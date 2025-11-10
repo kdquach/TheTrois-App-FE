@@ -25,42 +25,59 @@ import PaymentMethodSelector from '../checkout/PaymentMethodSelector';
 import { useAuthStore } from '../../store/authStore';
 import { useAddressStore } from '../../store/addressStore';
 import { useOrderStore } from '../../store/orderStore';
+import EditCartItemModal from './EditCartItemModal';
 
 const { width } = Dimensions.get('window');
 
 export default function CartScreen() {
   const theme = useTheme();
   const {
-    items,
-    updateQuantity,
-    removeFromCart,
-    getTotalPrice,
-    getTotalItems,
+    cart,
+    loading,
+    fetchCart,
+    addToCart,
+    updateCartItem,
+    removeCartItem,
     clearCart,
+    getItemTotalPrice,
   } = useCartStore();
-  const { user, logout, updateProfile, fetchUser } = useAuthStore();
+  const items = cart?.items || [];
+
+  const getTotalItems = () =>
+    items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+  const { user } = useAuthStore();
   const { selectedAddress, setSelectedAddress } = useAddressStore();
   const { createOrder } = useOrderStore();
-
+  const [editingItem, setEditingItem] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [showSummary, setShowSummary] = useState(false);
   const [overlayHeight, setOverlayHeight] = useState(0);
   const [orderNote, setOrderNote] = useState('');
 
   useEffect(() => {
-    const address = user?.addresses?.find((a) => a.isDefault === true);
-    setSelectedAddress(address);
+    if (user?.addresses) {
+      const address = user.addresses.find((a) => a.isDefault);
+      setSelectedAddress(address || null);
+    }
   }, [user]);
-  const handleQuantityChange = (productId, newQuantity) => {
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+    }, [fetchCart])
+  );
+
+  const handleQuantityChange = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(productId);
+      removeCartItem(itemId);
       Toast.show({
         type: 'info',
         text1: 'Đã xóa sản phẩm',
         text2: 'Sản phẩm đã được xóa khỏi giỏ hàng',
       });
     } else {
-      updateQuantity(productId, newQuantity);
+      updateCartItem(itemId, { quantity: newQuantity });
     }
   };
 
@@ -80,29 +97,37 @@ export default function CartScreen() {
       selectedAddress?.city?.name,
     ]
       .filter(Boolean)
-      .join(", ");
-    const products = items?.map(item => {
-      return {
-        productId: item.id,
-        name: item.name,
-        price: item.finalPrice || item.price,
-        quantity: item.quantity,
-        toppings: item.toppingsInfo?.map(t => ({ toppingId: t.id, name: t.name, price: t.price })) || [],
-        customization: item.customization?.description || null,
-      };
-    });
+      .join(', ');
+
+    const products = items.map((item) => ({
+      productId: item.productId?._id || item.productId,
+      name: item.name,
+      price: item.finalPrice || item.price,
+      quantity: item.quantity,
+      toppings:
+        item.toppings?.map((t) => {
+          // FIX CỨNG: Luôn lấy id từ bên trong object toppingId
+          const toppingId =
+            t.toppingId?.id || t.toppingId?._id || t.id || t._id;
+
+          return {
+            toppingId: toppingId,
+            name: t.name,
+            price: t.price,
+          };
+        }) || [],
+      customization: item.customization?.description || null,
+    }));
 
     const payload = {
       shippingAddress: orderAddress,
-      products: products,
-      totalAmount: getTotalPrice(),
+      products,
+      totalAmount: cart.totalPrice, // lấy trực tiếp từ BE
       note: orderNote,
-      payment: {
-        method: paymentMethod,
-      },
+      payment: { method: paymentMethod },
     };
 
-    const res = await createOrder(payload)
+    const res = await createOrder(payload);
     if (res?.success) {
       Toast.show({
         type: 'success',
@@ -113,10 +138,9 @@ export default function CartScreen() {
     }
   };
 
-  const getItemUnitPrice = (item) => {
-    return item.quantity * (item.finalPrice || item.price || 0);
+  const handleEditItem = (item) => {
+    setEditingItem(item);
   };
-
 
   const renderCartItem = (item) => (
     <Surface key={item.id} style={styles.cartItem} elevation={2}>
@@ -149,37 +173,44 @@ export default function CartScreen() {
             >
               {item.name}
             </Text>
-            <Surface style={styles.deleteButton} elevation={1}>
-              <IconButton
-                icon="close"
-                size={18}
-                iconColor={theme.colors.error}
-                onPress={() => {
-                  removeFromCart(item.id);
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Đã xóa sản phẩm',
-                    text2: 'Sản phẩm đã được xóa khỏi giỏ hàng',
-                  });
-                }}
-              />
-            </Surface>
+            <View style={styles.itemActions}>
+              {/* Nút Edit - MỚI */}
+              <Surface style={styles.editButton} elevation={1}>
+                <IconButton
+                  icon="pencil"
+                  size={18}
+                  iconColor={theme.colors.starbucksGreen}
+                  onPress={() => handleEditItem(item)}
+                />
+              </Surface>
+              <Surface style={styles.deleteButton} elevation={1}>
+                <IconButton
+                  icon="close"
+                  size={18}
+                  iconColor={theme.colors.error}
+                  onPress={() => removeCartItem(item.id)}
+                />
+              </Surface>
+            </View>
           </View>
 
           <Text
             variant="bodyMedium"
             style={[styles.itemPrice, { color: theme.colors.starbucksGreen }]}
           >
-            {formatCurrency(item.price)} / ly
+            {formatCurrency(item.finalPrice || item.price)} / ly
           </Text>
 
-          {item.toppingsInfo && item.toppingsInfo.length > 0 && (
+          {item.toppings?.length > 0 && (
             <View style={styles.toppingsList}>
-              {item.toppingsInfo.map((t, idx) => (
+              {item.toppings.map((t, idx) => (
                 <Text
                   key={idx}
                   variant="labelSmall"
-                  style={[styles.toppingLine, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
+                  style={[
+                    styles.toppingLine,
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.6 },
+                  ]}
                   numberOfLines={1}
                 >
                   {t.name} +{formatCurrency(t.price || 0)}
@@ -188,16 +219,45 @@ export default function CartScreen() {
             </View>
           )}
 
-          {/* Customization single line below toppings */}
-          {(item.customization?.description) && (
-            <Text
-              variant="labelSmall"
-              style={[styles.customizationText, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
-              numberOfLines={1}
-            >
-              {item.customization?.description}
-            </Text>
-          )}
+          {/* Customization - Hiển thị linh hoạt */}
+          {(() => {
+            const customization = item.customization;
+            if (!customization) return null;
+
+            const description = customization.description?.trim();
+
+            if (description) {
+              return (
+                <Text
+                  variant="labelSmall"
+                  style={[
+                    styles.customizationText,
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.6 },
+                  ]}
+                  numberOfLines={2}
+                >
+                  📝 {description}
+                </Text>
+              );
+            }
+
+            const size = customization.size || 'S';
+            const ice = customization.ice ?? 100;
+            const sugar = customization.sugar ?? 100;
+
+            return (
+              <Text
+                variant="labelSmall"
+                style={[
+                  styles.customizationText,
+                  { color: theme.colors.onSurfaceVariant, opacity: 0.6 },
+                ]}
+                numberOfLines={2}
+              >
+                📝 Size {size}, {ice}% đá, {sugar}% đường
+              </Text>
+            );
+          })()}
 
           <View style={styles.quantityAndTotal}>
             <Surface style={styles.quantityContainer} elevation={1}>
@@ -222,12 +282,11 @@ export default function CartScreen() {
                 onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
               />
             </Surface>
-
             <Text
               variant="titleLarge"
               style={[styles.subtotal, { color: theme.colors.starbucksGreen }]}
             >
-              {formatCurrency(getItemUnitPrice(item))}
+              {formatCurrency(getItemTotalPrice(item))}
             </Text>
           </View>
         </View>
@@ -238,13 +297,13 @@ export default function CartScreen() {
   const Section = ({ title, icon, children }) => (
     <Surface style={styles.sectionCard} elevation={2}>
       <View style={styles.sectionHeader}>
-        {icon ? (
+        {icon && (
           <MaterialCommunityIcons
             name={icon}
             size={20}
             color={theme.colors.starbucksGreen}
           />
-        ) : null}
+        )}
         <Text
           variant="titleMedium"
           style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
@@ -260,7 +319,7 @@ export default function CartScreen() {
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Starbucks-style Header */}
+      {/* Header */}
       <LinearGradient
         colors={[theme.colors.starbucksGreen, '#2E7D32']}
         style={styles.headerGradient}
@@ -358,19 +417,17 @@ export default function CartScreen() {
             onScroll={(e) => {
               const { contentOffset, layoutMeasurement, contentSize } =
                 e.nativeEvent;
-              const isBottom =
+              setShowSummary(
                 contentOffset.y + layoutMeasurement.height >=
-                contentSize.height - 1;
-              setShowSummary(isBottom);
+                  contentSize.height - 1
+              );
             }}
             scrollEventThrottle={16}
           >
-
             <Section title="Danh sách đồ uống" icon="format-list-bulleted">
               {items.map(renderCartItem)}
             </Section>
 
-            {/* Address section renders its own header/card, avoid duplicate title */}
             <ShippingAddressSection address={selectedAddress} />
 
             <Section title="Phương thức thanh toán" icon="credit-card-outline">
@@ -394,8 +451,8 @@ export default function CartScreen() {
                 right={<TextInput.Affix text={`${orderNote.length}/200`} />}
               />
             </Section>
-            {/* Summary overlay được render bên ngoài ScrollView */}
           </ScrollView>
+
           {showSummary && (
             <Surface
               style={styles.summaryOverlay}
@@ -426,7 +483,8 @@ export default function CartScreen() {
                         { color: theme.colors.starbucksGreen },
                       ]}
                     >
-                      {formatCurrency(getTotalPrice())}
+                      {formatCurrency(cart.totalPrice)}{' '}
+                      {/* Hoặc getTotalPriceFE() nếu muốn tự tính */}
                     </Text>
                   </View>
                 </View>
@@ -448,6 +506,11 @@ export default function CartScreen() {
               </LinearGradient>
             </Surface>
           )}
+          <EditCartItemModal
+            visible={!!editingItem}
+            item={editingItem}
+            onDismiss={() => setEditingItem(null)}
+          />
         </View>
       )}
     </View>
@@ -760,5 +823,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    borderRadius: 16,
+    backgroundColor: '#E8F5E9',
   },
 });
