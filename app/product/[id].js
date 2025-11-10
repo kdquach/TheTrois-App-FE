@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useProductStore } from '../../store/productStore';
+import { useFeedbackStore } from '../../store/feedbackStore';
 import { useCartStore } from '../../store/cartStore';
 import { formatCurrency } from '../../utils/format';
 import Toast from 'react-native-toast-message';
@@ -49,6 +50,7 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const { products } = useProductStore();
   const { addToCart } = useCartStore();
+  const { fetchFeedbacks, stats } = useFeedbackStore();
 
   // Find product by id (string comparison)
   const product = products.find((p) => p.id === id || p.id === String(id));
@@ -105,6 +107,14 @@ export default function ProductDetailScreen() {
       router.back();
     }
   }, [product, products, productToppings]);
+
+  // Fetch feedback stats for this product
+  useEffect(() => {
+    if (product?.id || id) {
+      const pid = product?.id || String(id);
+      fetchFeedbacks({ productId: pid }).catch(() => {});
+    }
+  }, [product?.id, id]);
 
   if (!product) {
     return (
@@ -257,10 +267,14 @@ export default function ProductDetailScreen() {
               color={theme.colors.starbucksGold}
             />
             <Text variant="titleMedium" style={styles.ratingText}>
-              4.8
+              {stats.average?.toFixed ? stats.average.toFixed(1) : stats.average}
             </Text>
-            <Text variant="bodyMedium" style={styles.reviewCount}>
-              (120+ đánh giá)
+            <Text
+              variant="bodyMedium"
+              style={styles.reviewCount}
+              onPress={() => router.push({ pathname: '/feedback/list', params: { productId: product?.id || String(id) } })}
+            >
+              ({stats.count} đánh giá)
             </Text>
           </View>
         </View>
