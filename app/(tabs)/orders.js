@@ -19,6 +19,7 @@ import LoadingIndicator from '../../components/LoadingIndicator';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import Toast from 'react-native-toast-message';
+import { router } from 'expo-router';
 
 const ORDER_STATUS_CONFIG = {
   pending: {
@@ -444,11 +445,21 @@ export default function OrdersScreen() {
             </View>
 
             {/* Action Buttons */}
-            {order.status === 'completed' && (
+            {order.status === 'completed' ? (
               <View style={styles.actionButtons}>
                 <Button
                   mode="outlined"
-                  onPress={() => { }}
+                  onPress={() => {
+                    // Navigate to product review list for first product as convenience
+                    const firstProduct = order.products?.[0];
+                    if (firstProduct?.productId || firstProduct?.id) {
+                      const pid = firstProduct.productId || firstProduct.id;
+                      try {
+                        // expo-router style path
+                        router.push({ pathname: '/feedback/list', params: { productId: pid } });
+                      } catch (e) {}
+                    }
+                  }}
                   style={styles.actionButton}
                   labelStyle={styles.actionButtonLabel}
                   icon="replay"
@@ -457,7 +468,16 @@ export default function OrdersScreen() {
                 </Button>
                 <Button
                   mode="contained"
-                  onPress={() => { }}
+                  onPress={() => {
+                    try {
+                      const oid = order.orderId || order.id;
+                      if (!oid) {
+                        Toast.show({ type: 'error', text1: 'Thiếu orderId để đánh giá' });
+                        return;
+                      }
+                      router.push({ pathname: '/feedback/order', params: { orderId: oid } });
+                    } catch (e) {}
+                  }}
                   style={[
                     styles.actionButton,
                     { backgroundColor: theme.colors.starbucksGreen },
@@ -466,6 +486,17 @@ export default function OrdersScreen() {
                   icon="star"
                 >
                   Đánh giá
+                </Button>
+              </View>
+            ) : (
+              <View style={styles.actionButtons}>
+                <Button
+                  mode="contained-tonal"
+                  disabled
+                  style={[styles.actionButton]}
+                  icon="lock"
+                >
+                  Đánh giá (chỉ khi hoàn thành)
                 </Button>
               </View>
             )}
