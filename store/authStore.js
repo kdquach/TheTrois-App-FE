@@ -168,6 +168,13 @@ export const useAuthStore = create((set, get) => ({
       if (response) await setUserData(response);
       set({ user: response, loading: false });
 
+      return response;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
+
   loginWithGoogle: async (googleData) => {
     set({ loading: true });
     try {
@@ -218,7 +225,7 @@ export const useAuthStore = create((set, get) => ({
       throw error;
     }
   },
-    
+
   logout: async () => {
     try {
       await clearAuth();
