@@ -116,7 +116,10 @@ export default function CartScreen() {
             price: t.price,
           };
         }) || [],
-      customization: item.customization?.description || null,
+      customization: {
+        size: item.customization?.size || 'S',
+        description: item.customization?.description || '',
+      },
     }));
 
     const payload = {
