@@ -19,27 +19,17 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outline,
-          borderTopWidth: 0.5,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          paddingTop: 8,
+          borderTopWidth: 0,
+          elevation: 6,
+          shadowColor: '#001f3f',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 14,
+          height: Platform.OS === 'ios' ? 72 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 16,
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 4,
-        },
-        tabBarIconStyle: {
-          marginTop: 4,
-        },
       }}
     >
       <Tabs.Screen
@@ -49,7 +39,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size, focused }) => (
             <MaterialCommunityIcons
               name={focused ? 'home' : 'home-outline'}
-              size={size}
+              size={20}
               color={color}
             />
           ),
@@ -63,16 +53,16 @@ export default function TabLayout() {
           tabBarBadgeStyle: {
             backgroundColor: theme.colors.error,
             color: '#FFFFFF',
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: 'bold',
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 8,
           },
           tabBarIcon: ({ color, size, focused }) => (
             <MaterialCommunityIcons
               name={focused ? 'cart' : 'cart-outline'}
-              size={size}
+              size={20}
               color={color}
             />
           ),
@@ -84,8 +74,8 @@ export default function TabLayout() {
           title: 'Đơn hàng',
           tabBarIcon: ({ color, size, focused }) => (
             <MaterialCommunityIcons
-              name={focused ? 'clipboard-list' : 'clipboard-list-outline'}
-              size={size}
+              name={focused ? 'clipboard-clock' : 'clipboard-clock-outline'}
+              size={20}
               color={color}
             />
           ),
@@ -98,7 +88,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size, focused }) => (
             <MaterialCommunityIcons
               name={focused ? 'account' : 'account-outline'}
-              size={size}
+              size={20}
               color={color}
             />
           ),

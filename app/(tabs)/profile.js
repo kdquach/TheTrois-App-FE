@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,7 +20,6 @@ import {
   Portal,
   TextInput,
   Surface,
-  Badge,
   ProgressBar,
   ActivityIndicator,
 } from 'react-native-paper';
@@ -31,6 +30,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
+import { useOrderStore } from '../../store/orderStore';
 import Toast from 'react-native-toast-message';
 import { changePassword } from '../../api/authApi';
 
@@ -40,6 +40,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { user, logout, updateProfile, loading } = useAuthStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
+  const { orders, fetchOrders } = useOrderStore();
 
   const [editDialogVisible, setEditDialogVisible] = useState(false);
   const [changePasswordDialogVisible, setChangePasswordDialogVisible] =
@@ -58,6 +59,26 @@ export default function ProfileScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
 
+
+  useEffect(() => {
+    // Fetch orders once to compute totals for overview
+    if (!orders || orders.length === 0) {
+      fetchOrders('completed').catch(() => {});
+    }
+  }, []);
+
+  const safeNumber = (n) => (isFinite(n) ? n : 0);
+  const totalOrders = Array.isArray(orders) ? orders.length : 0;
+  const totalSpent = Array.isArray(orders)
+    ? orders.reduce((sum, o) => {
+        const s = o?.total || o?.amount || o?.grandTotal || 0;
+        return sum + safeNumber(Number(s));
+      }, 0)
+    : 0;
+  // Streak placeholder (can be computed via login/activity data later)
+  const streakDays = 7;
+  const streakGoal = 30;
+  const streakProgress = Math.max(0, Math.min(1, (streakDays || 0) / streakGoal));
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
@@ -207,161 +228,36 @@ export default function ProfileScreen() {
     }
   };
 
-  const quickActions = [
-    {
-      icon: 'receipt-text',
-      label: 'Đơn hàng',
-      color: theme.colors.starbucksGreen,
-      badge: '3',
-      onPress: () => router.push('/(tabs)/orders'),
-    },
-    {
-      icon: 'heart',
-      label: 'Yêu thích',
-      color: '#FF6B9D',
-      badge: '12',
-      onPress: () => {
-        Toast.show({
-          type: 'info',
-          text1: 'Tính năng đang phát triển',
-        });
-      },
-    },
-    {
-      icon: 'ticket-percent',
-      label: 'Voucher',
-      color: '#FFB74D',
-      badge: '5',
-      onPress: () => {
-        Toast.show({
-          type: 'info',
-          text1: 'Tính năng đang phát triển',
-        });
-      },
-    },
-    {
-      icon: 'wallet-giftcard',
-      label: 'Quà tặng',
-      color: '#FF5252',
-      onPress: () => {
-        Toast.show({
-          type: 'info',
-          text1: 'Tính năng đang phát triển',
-        });
-      },
-    },
-  ];
+  // (moved streakDays above to avoid TDZ issues)
 
-  const statistics = [
-    {
-      icon: 'shopping',
-      label: 'Đơn hàng',
-      value: '28',
-      color: theme.colors.starbucksGreen,
-    },
-    {
-      icon: 'cup',
-      label: 'Sản phẩm',
-      value: '156',
-      color: '#00BCD4',
-    },
-    {
-      icon: 'cash-multiple',
-      label: 'Chi tiêu',
-      value: '2.5M',
-      color: '#FF9800',
-    },
-    {
-      icon: 'trophy',
-      label: 'Thành tựu',
-      value: '12',
-      color: theme.colors.starbucksGold,
-    },
-  ];
+  const currency = (n) => {
+    try {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n || 0);
+    } catch {
+      return `${Math.round(n || 0).toLocaleString('vi-VN')} đ`;
+    }
+  };
 
-  const achievements = [
-    {
-      icon: 'fire',
-      title: 'Streak Master',
-      description: '7 ngày liên tiếp',
-      progress: 0.7,
-      color: '#FF6B35',
-    },
-    {
-      icon: 'star-circle',
-      title: 'VIP Member',
-      description: 'Hạng Gold',
-      progress: 0.85,
-      color: theme.colors.starbucksGold,
-    },
-  ];
+  // Remove achievements/quick actions for simplified layout per request
 
   const settingsSections = [
     {
       title: 'Tài khoản',
       icon: 'account-circle',
       items: [
-        {
-          title: 'Thông tin cá nhân',
-          icon: 'account-edit',
-          onPress: () => setEditDialogVisible(true),
-        },
-        {
-          title: 'Sổ địa chỉ',
-          icon: 'map-marker-outline',
-          onPress: () => router.push('/addresses'),
-        },
-        {
-          title: 'Đổi mật khẩu',
-          icon: 'lock-reset',
-          onPress: () => setChangePasswordDialogVisible(true),
-        },
-      ],
-    },
-    {
-      title: 'Cài đặt',
-      icon: 'cog',
-      items: [
-        {
-          title: 'Chế độ tối',
-          icon: 'theme-light-dark',
-          isSwitch: true,
-          value: isDarkMode,
-          onPress: toggleTheme,
-        },
-        {
-          title: 'Thông báo',
-          icon: 'bell-outline',
-          isSwitch: true,
-          value: true,
-          onPress: () => { },
-        },
+        { title: 'Chỉnh sửa thông tin', icon: 'account-edit', onPress: () => setEditDialogVisible(true) },
+        { title: 'Danh sách địa chỉ', icon: 'map-marker-outline', onPress: () => router.push('/addresses') },
+        { title: 'Đổi mật khẩu', icon: 'lock-reset', onPress: () => setChangePasswordDialogVisible(true) },
       ],
     },
     {
       title: 'Hỗ trợ',
       icon: 'help-circle',
       items: [
-        {
-          title: 'Điều khoản sử dụng',
-          icon: 'file-document-outline',
-          onPress: () => { },
-        },
-        {
-          title: 'Chính sách bảo mật',
-          icon: 'shield-check-outline',
-          onPress: () => { },
-        },
-        {
-          title: 'Liên hệ hỗ trợ',
-          icon: 'phone-outline',
-          onPress: () => { },
-        },
-        {
-          title: 'Đánh giá ứng dụng',
-          icon: 'star-outline',
-          onPress: () => { },
-        },
+        { title: 'Điều khoản sử dụng', icon: 'file-document-outline', onPress: () => {} },
+        { title: 'Chính sách bảo mật', icon: 'shield-check-outline', onPress: () => {} },
+        { title: 'Liên hệ hỗ trợ', icon: 'phone-outline', onPress: () => {} },
+        { title: 'Đánh giá ứng dụng', icon: 'star-outline', onPress: () => {} },
       ],
     },
   ];
@@ -375,266 +271,98 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern Hero Section */}
+        {/* Row 1: Hero gradient (no outer margin), strong bottom radius, padded bottom for overlay */}
         <LinearGradient
-          colors={[theme.colors.starbucksGreen, '#00695C', '#004D40']}
+          colors={[theme.colors.primary, theme.colors.successStrong || theme.colors.primary]}
           style={styles.heroSection}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          {/* Avatar & Info */}
           <View style={styles.profileHeader}>
             <View style={styles.avatarWrapper}>
-              <Surface style={styles.avatarSurface} elevation={8}>
+              <Surface style={styles.avatarSurface}>
                 {user?.avatar ? (
-                  <Avatar.Image
-                    size={90}
-                    source={{ uri: user.avatar }}
-                    style={{
-                      borderColor: '#FFFFFF',
-                      opacity: loading ? 0.4 : 1, // Làm mờ khi đang upload
-                    }}
-
-                  />
+                  <Avatar.Image size={80} source={{ uri: user.avatar }} style={{ opacity: loading ? 0.4 : 1 }} />
                 ) : (
-                  <Avatar.Text
-                    size={90}
-                    label={user?.name?.charAt(0).toUpperCase() || 'U'}
-                    style={{
-                      backgroundColor: theme.colors.starbucksGold,
-                      borderWidth: 4,
-                      borderColor: '#FFFFFF',
-                    }}
-                    labelStyle={styles.avatarLabel}
-                  />
+                  <Avatar.Text size={80} label={user?.name?.charAt(0).toUpperCase() || 'U'} style={{ backgroundColor: theme.colors.accent }} labelStyle={styles.avatarLabel} />
                 )}
-                {/* 🔥 Overlay loading trong avatar */}
                 {loading && (
                   <View style={styles.avatarLoading}>
                     <ActivityIndicator size="small" color="#fff" />
                   </View>
                 )}
               </Surface>
-              <TouchableOpacity
-                style={styles.cameraButton}
-                onPress={handlePickAvatar}
-                activeOpacity={0.7}
-              >
-                <LinearGradient
-                  colors={[theme.colors.starbucksGold, '#D4A574']}
-                  style={styles.cameraGradient}
-                >
-                  <MaterialCommunityIcons
-                    name="camera"
-                    size={18}
-                    color="#FFFFFF"
-                  />
-                </LinearGradient>
+              {/* Smaller edit avatar icon (bottom-right overlay) */}
+              <TouchableOpacity style={styles.cameraButtonBR} onPress={handlePickAvatar} activeOpacity={0.8}>
+                <View style={styles.cameraCircle}>
+                  <MaterialCommunityIcons name="camera" size={14} color="#fff" />
+                </View>
               </TouchableOpacity>
             </View>
-
-            <Text variant="headlineMedium" style={styles.userName}>
-              {user?.name || 'Người dùng'}
-            </Text>
-            <Text variant="bodyLarge" style={styles.userEmail}>
-              {user?.email || 'user@example.com'}
-            </Text>
-            {user?.phone && (
-              <View style={styles.phoneContainer}>
-                <MaterialCommunityIcons
-                  name="cellphone"
-                  size={14}
-                  color="rgba(255,255,255,0.9)"
-                />
-                <Text variant="bodyMedium" style={styles.userPhone}>
-                  {user.phone}
-                </Text>
-              </View>
-            )}
-
-            {/* Level & Points Card */}
-            <Surface style={styles.levelCard} elevation={4}>
-              <View style={styles.levelContent}>
-                <View style={styles.levelLeft}>
-                  <View style={styles.levelBadge}>
-                    <MaterialCommunityIcons
-                      name="crown"
-                      size={24}
-                      color={theme.colors.starbucksGold}
-                    />
-                  </View>
-                  <View>
-                    <Text variant="labelSmall" style={styles.levelLabel}>
-                      Hạng thành viên
-                    </Text>
-                    <Text variant="titleLarge" style={styles.levelText}>
-                      Gold Member
-                    </Text>
-                  </View>
-                </View>
-                <Divider style={styles.levelDivider} />
-                <View style={styles.levelRight}>
-                  <MaterialCommunityIcons
-                    name="star-circle"
-                    size={24}
-                    color={theme.colors.starbucksGold}
-                  />
-                  <View style={styles.pointsInfo}>
-                    <Text variant="titleLarge" style={styles.pointsValue}>
-                      2,580
-                    </Text>
-                    <Text variant="labelSmall" style={styles.pointsLabel}>
-                      Điểm tích lũy
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.progressSection}>
-                <View style={styles.progressHeader}>
-                  <Text variant="labelSmall" style={styles.progressLabel}>
-                    420 điểm nữa để lên Platinum
-                  </Text>
-                  <Text variant="labelSmall" style={styles.progressPercent}>
-                    86%
-                  </Text>
-                </View>
-                <ProgressBar
-                  progress={0.86}
-                  color={theme.colors.starbucksGold}
-                  style={styles.progressBar}
-                />
-              </View>
-            </Surface>
+            <Text style={[styles.userName, { color: theme.colors.onPrimary }]}>{user?.name || 'Người dùng'}</Text>
+            {user?.email && <Text style={[styles.userEmail, { color: theme.colors.onPrimary, opacity: 0.85 }]}>{user.email}</Text>}
           </View>
         </LinearGradient>
 
-        {/* Statistics Grid */}
-        <View style={styles.statsContainer}>
-          {statistics.map((stat, index) => (
-            <Surface key={index} style={styles.statCard} elevation={2}>
-              <View
-                style={[
-                  styles.statIcon,
-                  { backgroundColor: `${stat.color}15` },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={stat.icon}
-                  size={24}
-                  color={stat.color}
-                />
+        {/* Row 2: Overview as a single grouped card */}
+        <View style={styles.overviewWrapper}>
+          <View style={[styles.overviewGroup, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.metricsRow}>
+              <View style={styles.metricItem}>
+                <View style={[styles.metricIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
+                  <MaterialCommunityIcons name="shopping" size={18} color={theme.colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.overviewLabel}>Đơn đã mua</Text>
+                  <Text style={styles.overviewValue}>{totalOrders}</Text>
+                </View>
               </View>
-              <Text variant="headlineSmall" style={styles.statValue}>
-                {stat.value}
-              </Text>
-              <Text variant="bodySmall" style={styles.statLabel}>
-                {stat.label}
-              </Text>
-            </Surface>
-          ))}
-        </View>
+              <View style={styles.metricItem}>
+                <View style={[styles.metricIcon, { backgroundColor: `${theme.colors.accent}15` }]}>
+                  <MaterialCommunityIcons name="cash-multiple" size={18} color={theme.colors.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.overviewLabel}>Đã chi</Text>
+                  <Text style={styles.overviewValue}>{currency(totalSpent)}</Text>
+                </View>
+              </View>
+            </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <Text variant="titleMedium" style={styles.sectionHeading}>
-            Tiện ích nhanh
-          </Text>
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={action.onPress}
-                activeOpacity={0.7}
-                style={styles.actionItem}
-              >
-                <Surface style={styles.actionCard} elevation={3}>
-                  <View style={styles.actionIconWrapper}>
-                    <View
-                      style={[
-                        styles.actionIcon,
-                        { backgroundColor: `${action.color}20` },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name={action.icon}
-                        size={26}
-                        color={action.color}
-                      />
-                    </View>
-                    {action.badge && (
-                      <Badge style={styles.actionBadge} size={18}>
-                        {action.badge}
-                      </Badge>
-                    )}
-                  </View>
-                  <Text
-                    variant="labelMedium"
-                    style={styles.actionLabel}
-                    numberOfLines={1}
-                  >
-                    {action.label}
-                  </Text>
-                </Surface>
-              </TouchableOpacity>
-            ))}
+            <View style={styles.streakRow}>
+              <View style={[styles.metricIcon, { backgroundColor: `${theme.colors.dangerBright}15` }]}>
+                <MaterialCommunityIcons name="fire" size={18} color={theme.colors.dangerBright} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <View style={styles.streakHeaderRow}>
+                  <Text style={styles.overviewLabel}>Chuỗi ngày hoạt động</Text>
+                  <Text style={styles.streakValue}>{streakDays} ngày</Text>
+                </View>
+                <ProgressBar progress={streakProgress} color={theme.colors.dangerBright} style={[styles.streakProgress, { backgroundColor: theme.colors.borderColor }]} />
+              </View>
+            </View>
           </View>
         </View>
+            
+        {/* Quick Actions removed per new design */}
 
-        {/* Achievements */}
-        <View style={styles.achievementsSection}>
-          <Text variant="titleMedium" style={styles.sectionHeading}>
-            Thành tựu
-          </Text>
-          {achievements.map((achievement, index) => (
-            <Surface key={index} style={styles.achievementCard} elevation={2}>
-              <View
-                style={[
-                  styles.achievementIcon,
-                  { backgroundColor: `${achievement.color}20` },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={achievement.icon}
-                  size={28}
-                  color={achievement.color}
-                />
-              </View>
-              <View style={styles.achievementContent}>
-                <Text variant="titleSmall" style={styles.achievementTitle}>
-                  {achievement.title}
-                </Text>
-                <Text variant="bodySmall" style={styles.achievementDesc}>
-                  {achievement.description}
-                </Text>
-                <ProgressBar
-                  progress={achievement.progress}
-                  color={achievement.color}
-                  style={styles.achievementProgress}
-                />
-              </View>
-            </Surface>
-          ))}
-        </View>
-
+        {/* Row 3: Settings sections and logout */}
+        <View style={styles.row3Container}>
         {/* Settings Sections */}
         {settingsSections.map((section, sectionIndex) => (
-          <Surface
-            key={sectionIndex}
-            style={styles.settingsSection}
-            elevation={2}
-          >
+          <View key={sectionIndex}>
+            <View style={styles.settingsSection}>
             <View style={styles.settingsSectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <View
                   style={[
                     styles.sectionIconWrapper,
-                    { backgroundColor: `${theme.colors.starbucksGreen}15` },
+                    { backgroundColor: `${theme.colors.primary}15` },
                   ]}
                 >
                   <MaterialCommunityIcons
                     name={section.icon}
                     size={20}
-                    color={theme.colors.starbucksGreen}
+                    color={theme.colors.primary}
                   />
                 </View>
                 <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -646,12 +374,15 @@ export default function ProfileScreen() {
               <View key={itemIndex}>
                 <List.Item
                   title={item.title}
-                  titleStyle={styles.listItemTitle}
+                  titleStyle={[
+                    styles.listItemTitle,
+                    item.icon === 'map-marker-outline' && { fontSize: 14 },
+                  ]}
                   left={(props) => (
                     <View style={styles.listIconWrapper}>
                       <MaterialCommunityIcons
                         name={item.icon}
-                        size={22}
+                        size={item.icon === 'map-marker-outline' ? 20 : 22}
                         color={theme.colors.onSurface}
                       />
                     </View>
@@ -661,7 +392,7 @@ export default function ProfileScreen() {
                       <Switch
                         value={item.value}
                         onValueChange={item.onPress}
-                        color={theme.colors.starbucksGreen}
+                        color={theme.colors.primary}
                       />
                     ) : (
                       <MaterialCommunityIcons
@@ -672,15 +403,17 @@ export default function ProfileScreen() {
                     )
                   }
                   onPress={item.onPress}
-                  style={styles.listItem}
+                  style={[
+                    styles.listItem,
+                    item.icon === 'map-marker-outline' && { paddingVertical: 0 },
+                  ]}
                 />
-                {itemIndex < section.items.length - 1 && (
-                  <Divider style={styles.itemDivider} />
-                )}
               </View>
             ))}
-          </Surface>
+            </View>
+          </View>
         ))}
+        </View>
 
         {/* Logout Button */}
         <TouchableOpacity
@@ -688,9 +421,9 @@ export default function ProfileScreen() {
           activeOpacity={0.8}
           style={styles.logoutButtonWrapper}
         >
-          <Surface style={styles.logoutContainer} elevation={3}>
+          <View style={[styles.logoutContainer, { backgroundColor: theme.colors.surface }]}>
             <LinearGradient
-              colors={['#EF5350', '#E53935']}
+              colors={[theme.colors.dangerBright, theme.colors.error]}
               style={styles.logoutGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -704,7 +437,7 @@ export default function ProfileScreen() {
                 Đăng xuất
               </Text>
             </LinearGradient>
-          </Surface>
+          </View>
         </TouchableOpacity>
 
         {/* App Version */}
@@ -725,9 +458,10 @@ export default function ProfileScreen() {
         <Dialog
           visible={editDialogVisible}
           onDismiss={() => setEditDialogVisible(false)}
+          style={[styles.dialogCard, { backgroundColor: theme.colors.surface }]}
         >
-          <Dialog.Title>Chỉnh sửa thông tin</Dialog.Title>
-          <Dialog.Content>
+          <Dialog.Title style={styles.dialogTitle}>Chỉnh sửa thông tin</Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
             <TextInput
               label="Họ và tên"
               value={editForm.name}
@@ -746,25 +480,25 @@ export default function ProfileScreen() {
               left={<TextInput.Icon icon="phone" />}
             />
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEditDialogVisible(false)}>Hủy</Button>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button onPress={() => setEditDialogVisible(false)} style={{ borderRadius: 10 }}>Hủy</Button>
             <Button
               onPress={handleUpdateProfile}
               mode="contained"
-              style={{ backgroundColor: theme.colors.starbucksGreen }}
+              style={{ backgroundColor: theme.colors.primary, borderRadius: 10 }}
             >
               Lưu
             </Button>
           </Dialog.Actions>
         </Dialog>
 
-        {/* Change Password Dialog */}
         <Dialog
           visible={changePasswordDialogVisible}
           onDismiss={() => setChangePasswordDialogVisible(false)}
+          style={[styles.dialogCard, { backgroundColor: theme.colors.surface }]}
         >
-          <Dialog.Title>Đổi mật khẩu</Dialog.Title>
-          <Dialog.Content>
+          <Dialog.Title style={styles.dialogTitle}>Đổi mật khẩu</Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
             <TextInput
               label="Mật khẩu hiện tại"
               value={passwordForm.currentPassword}
@@ -817,14 +551,14 @@ export default function ProfileScreen() {
               }
             />
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setChangePasswordDialogVisible(false)}>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button onPress={() => setChangePasswordDialogVisible(false)} style={{ borderRadius: 10 }}>
               Hủy
             </Button>
             <Button
               onPress={handleChangePassword}
               mode="contained"
-              style={{ backgroundColor: theme.colors.starbucksGreen }}
+              style={{ backgroundColor: theme.colors.primary, borderRadius: 10 }}
             >
               Đổi mật khẩu
             </Button>
@@ -848,19 +582,19 @@ const styles = StyleSheet.create({
 
   // Hero Section
   heroSection: {
-    paddingTop: 60,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    marginBottom: -20,
+    paddingTop: 52,
+    paddingBottom: 64, // leave space for overlap of row 2
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
   },
   profileHeader: {
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   avatarSurface: {
     borderRadius: 50,
@@ -871,39 +605,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  cameraButton: {
+  cameraButtonBR: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
+    bottom: -2,
+    right: -2,
+    borderRadius: 12,
   },
-  cameraGradient: {
-    width: 36,
-    height: 36,
+  cameraCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#666',
     alignItems: 'center',
     justifyContent: 'center',
   },
   userName: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  userEmail: {
-    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '700',
+    fontSize: 18,
     marginBottom: 4,
   },
-  phoneContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 20,
+  userEmail: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    marginBottom: 12,
   },
-  userPhone: {
-    color: 'rgba(255,255,255,0.9)',
-  },
+  
 
   // Level Card
   levelCard: {
@@ -980,121 +707,72 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
 
-  // Statistics
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 20,
-    paddingTop: 30,
+  // Row 2 overview
+  overviewWrapper: {
+    marginTop: -40, // pull up to overlap hero
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  overviewGroup: {
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    padding: 14,
     gap: 12,
+    // subtle shadow for pop-up effect on row 2
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  statCard: {
-    width: (width - 52) / 2,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  statValue: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-
-  // Quick Actions
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionHeading: {
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  actionsGrid: {
+  metricsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
-  actionItem: {
-    width: (width - 52) / 4,
-  },
-  actionCard: {
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  actionIconWrapper: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF5252',
-    color: '#FFFFFF',
-  },
-  actionLabel: {
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  // Achievements
-  achievementsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  achievementCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  achievementIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  achievementContent: {
+  metricItem: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  achievementTitle: {
-    fontWeight: 'bold',
+  metricIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overviewLabel: {
+    fontSize: 12,
+    opacity: 0.7,
     marginBottom: 4,
   },
-  achievementDesc: {
-    opacity: 0.7,
-    marginBottom: 8,
+  overviewValue: {
+    fontWeight: '700',
+    fontSize: 16,
   },
-  achievementProgress: {
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  streakHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  streakProgress: {
     height: 6,
     borderRadius: 3,
     backgroundColor: '#F0F0F0',
   },
+  streakValue: {
+    fontWeight: '700',
+    fontSize: 16,
+  },
+
+  // Quick Actions removed
+
+  // removed achievements section per new spec
 
   // Settings
   settingsSection: {
@@ -1102,7 +780,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
   },
   settingsSectionHeader: {
     padding: 16,
@@ -1144,7 +821,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logoutContainer: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
   },
@@ -1152,12 +829,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 18,
+    padding: 8,
     gap: 10,
   },
   logoutText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  row3Container: {
+    paddingTop: 12,
+  },
+  dialogCard: {
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  dialogTitle: {
+    fontWeight: '700',
+  },
+  dialogContent: {
+    paddingTop: 0,
+  },
+  dialogActions: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
 
   // Version

@@ -395,7 +395,7 @@ export default function FeedbackListScreen() {
                <Dialog
                   visible={!!editFb}
                   onDismiss={() => setEditFb(null)}
-                  style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+                  style={{ borderRadius: 14, backgroundColor: palette.card }}
                >
                   <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Sửa đánh giá</Dialog.Title>
                   <Dialog.Content>
@@ -411,13 +411,13 @@ export default function FeedbackListScreen() {
                      />
                   </Dialog.Content>
                   <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                     <Button onPress={() => setEditFb(null)} textColor={palette.textSecondary}>Hủy</Button>
+                     <Button onPress={() => setEditFb(null)} textColor={palette.textSecondary} style={{ borderRadius: 10 }}>Hủy</Button>
                      <Button
                         mode="contained"
                         onPress={saveEdit}
                         buttonColor={palette.accent}
                         textColor={palette.textPrimary}
-                        style={{ borderRadius: 8 }}
+                        style={{ borderRadius: 10 }}
                      >Lưu</Button>
                   </Dialog.Actions>
                </Dialog>
@@ -426,15 +426,15 @@ export default function FeedbackListScreen() {
                <Dialog
                   visible={!!confirmDelete}
                   onDismiss={() => setConfirmDelete(null)}
-                  style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+                  style={{ borderRadius: 14, backgroundColor: palette.card }}
                >
                   <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Xóa đánh giá?</Dialog.Title>
                   <Dialog.Content>
                      <Text style={{ color: palette.textSecondary }}>Bạn có chắc chắn muốn xóa đánh giá này?</Text>
                   </Dialog.Content>
                   <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                     <Button onPress={() => setConfirmDelete(null)} textColor={palette.textSecondary}>Hủy</Button>
-                     <Button onPress={doDelete} textColor={palette.danger}>Xóa</Button>
+                     <Button onPress={() => setConfirmDelete(null)} textColor={palette.textSecondary} style={{ borderRadius: 10 }}>Hủy</Button>
+                     <Button onPress={doDelete} textColor={palette.danger} style={{ borderRadius: 10 }}>Xóa</Button>
                   </Dialog.Actions>
                </Dialog>
 
@@ -442,7 +442,7 @@ export default function FeedbackListScreen() {
                <Dialog
                   visible={!!editingReply}
                   onDismiss={() => setEditingReply(null)}
-                  style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+                  style={{ borderRadius: 14, backgroundColor: palette.card }}
                >
                   <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Sửa phản hồi</Dialog.Title>
                   <Dialog.Content>
@@ -457,13 +457,13 @@ export default function FeedbackListScreen() {
                      />
                   </Dialog.Content>
                   <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                     <Button onPress={() => setEditingReply(null)} textColor={palette.textSecondary}>Hủy</Button>
+                     <Button onPress={() => setEditingReply(null)} textColor={palette.textSecondary} style={{ borderRadius: 10 }}>Hủy</Button>
                      <Button
                         mode="contained"
                         onPress={onSaveEditReply}
                         buttonColor={palette.accent}
                         textColor={palette.textPrimary}
-                        style={{ borderRadius: 8 }}
+                        style={{ borderRadius: 10 }}
                      >Lưu</Button>
                   </Dialog.Actions>
                </Dialog>
@@ -472,14 +472,14 @@ export default function FeedbackListScreen() {
                <Dialog
                   visible={!!confirmDeleteReply}
                   onDismiss={() => setConfirmDeleteReply(null)}
-                  style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+                  style={{ borderRadius: 14, backgroundColor: palette.card }}
                >
                   <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Xóa phản hồi?</Dialog.Title>
                   <Dialog.Content>
                      <Text style={{ color: palette.textSecondary }}>Bạn có chắc chắn muốn xóa phản hồi này?</Text>
                   </Dialog.Content>
                   <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                     <Button onPress={() => setConfirmDeleteReply(null)} textColor={palette.textSecondary}>Hủy</Button>
+                     <Button onPress={() => setConfirmDeleteReply(null)} textColor={palette.textSecondary} style={{ borderRadius: 10 }}>Hủy</Button>
                      <Button
                         onPress={() => {
                            const ctx = confirmDeleteReply;
@@ -487,6 +487,7 @@ export default function FeedbackListScreen() {
                            if (ctx?.fid && ctx?.rid) onDeleteReply(ctx.fid, ctx.rid);
                         }}
                         textColor={palette.danger}
+                        style={{ borderRadius: 10 }}
                      >Xóa</Button>
                   </Dialog.Actions>
                </Dialog>

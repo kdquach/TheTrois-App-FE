@@ -26,8 +26,10 @@ import {
 } from "../../api/addressesApi";
 import { getProvinces, getDistricts, getWards } from "vietnam-provinces";
 import { useAuthStore } from "../../store/authStore";
+import { useTheme } from 'react-native-paper';
 
 export default function AddressForm() {
+  const theme = useTheme();
   const { id, from } = useLocalSearchParams();
   const { fetchUser, updateAddress } = useAuthStore();
   const isEdit = Boolean(id);
@@ -172,28 +174,29 @@ export default function AddressForm() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#F9F6EE" }}
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Appbar.Header style={styles.header}>
-        <Appbar.BackAction onPress={() => from === 'cart' ? router.push('/checkout') : router.back()} color="#333" />
+      <Appbar.Header style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.borderColor }] }>
+        <Appbar.BackAction onPress={() => from === 'cart' ? router.push('/checkout') : router.back()} color={theme.colors.textPrimary} />
         <Appbar.Content
           title={isEdit ? "Chỉnh sửa địa chỉ" : "Thêm địa chỉ"}
-          color="#333"
+          color={theme.colors.textPrimary}
         />
       </Appbar.Header>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Surface style={styles.card} elevation={1}>
-          <Text style={styles.sectionTitle}>Thông tin địa chỉ</Text>
-          <Divider style={styles.divider} />
+      <ScrollView contentContainerStyle={[styles.scroll, { backgroundColor: theme.colors.background }]}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderColor }]} elevation={0}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Thông tin địa chỉ</Text>
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.borderColor }]} />
 
           <TextInput
             label="Địa chỉ chi tiết"
             mode="outlined"
             value={form.street}
             onChangeText={(t) => setField("street", t)}
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.colors.surface }]}
+            outlineStyle={{ borderColor: theme.colors.borderColor }}
           />
 
           {renderDropdown(
@@ -230,11 +233,11 @@ export default function AddressForm() {
           )}
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Đặt làm mặc định</Text>
+            <Text style={[styles.switchLabel, { color: theme.colors.textPrimary }]}>Đặt làm mặc định</Text>
             <Switch
               value={form.isDefault}
               onValueChange={(v) => setField("isDefault", v)}
-              color="#A3C9A8"
+              color={theme.colors.primary}
             />
           </View>
 
@@ -242,8 +245,8 @@ export default function AddressForm() {
             mode="contained"
             onPress={onSave}
             loading={saving}
-            style={styles.saveButton}
-            labelStyle={styles.saveLabel}
+            style={[styles.saveButton, { backgroundColor: theme.colors.primary }]}
+            labelStyle={[styles.saveLabel, { color: theme.colors.onPrimary }]}
           >
             {isEdit ? "Cập nhật địa chỉ" : "Tạo địa chỉ"}
           </Button>
@@ -254,19 +257,19 @@ export default function AddressForm() {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: "#F9F6EE", elevation: 0, borderBottomWidth: 1, borderBottomColor: "#E0DAD0" },
-  scroll: { padding: 16, backgroundColor: "#F9F6EE" },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 5, borderWidth: 1, borderColor: "#EDEAE4" },
-  sectionTitle: { fontSize: 18, fontWeight: "600", color: "#5B4636", marginBottom: 8 },
-  divider: { backgroundColor: "#E6E0D4", marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "500", color: "#6D5844", marginBottom: 6 },
-  input: { backgroundColor: "#FFFFFF", borderRadius: 10, marginBottom: 16 },
-  dropdown: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7CCC8", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  placeholder: { color: "#9E9E9E", fontSize: 15 },
-  selectedText: { color: "#5B4636", fontSize: 15, fontWeight: "500" },
+  header: { elevation: 0, borderBottomWidth: 1 },
+  scroll: { padding: 16 },
+  card: { borderRadius: 12, padding: 16, borderWidth: 1 },
+  sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
+  divider: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: "500", marginBottom: 6 },
+  input: { borderRadius: 10, marginBottom: 16 },
+  dropdown: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  placeholder: { fontSize: 15 },
+  selectedText: { fontSize: 15, fontWeight: "500" },
   switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 24 },
-  switchLabel: { color: "#5B4636", fontSize: 15, fontWeight: "500" },
-  saveButton: { borderRadius: 10, backgroundColor: "#A3C9A8", paddingVertical: 10 },
-  saveLabel: { color: "#5B4636", fontSize: 16, fontWeight: "600" },
+  switchLabel: { fontSize: 15, fontWeight: "500" },
+  saveButton: { borderRadius: 10, paddingVertical: 10 },
+  saveLabel: { fontSize: 16, fontWeight: "600" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

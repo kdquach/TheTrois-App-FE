@@ -11,12 +11,14 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native-paper";
+import { useTheme } from 'react-native-paper';
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import Toast from "react-native-toast-message";
 import { getMyAddresses, deleteAddress } from "../../api/addressesApi";
 import { useAddressStore } from "../../store/addressStore";
 
 export default function AddressListScreen() {
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [addresses, setAddresses] = useState([]);
   const [confirm, setConfirm] = useState({ visible: false, item: null });
@@ -24,13 +26,14 @@ export default function AddressListScreen() {
   const { setSelectedAddress } = useAddressStore();
   const { from } = useLocalSearchParams();
 
+  // Colors come from theme (aligned with variables.css)
   const palette = {
-    background: "#FAF9F6",
-    card: "#FFFFFF",
-    accent: "#A3C9A8",
-    beige: "#E9E3D5",
-    textPrimary: "#3E3B32",
-    textSecondary: "#6B675F",
+    background: theme.colors.background,
+    card: theme.colors.surface,
+    accent: theme.colors.primary,
+    beige: theme.colors.borderColor,
+    textPrimary: theme.colors.textPrimary || theme.colors.onSurface,
+    textSecondary: theme.colors.textSecondary || theme.colors.onSurfaceVariant,
   };
   useFocusEffect(
     useCallback(() => {
@@ -94,10 +97,10 @@ export default function AddressListScreen() {
         mode="outlined"
         style={{
           marginVertical: 8,
-          borderRadius: 10,
+          borderRadius: 12,
           borderColor: palette.beige,
           backgroundColor: palette.card,
-          elevation: 1,
+          elevation: 0,
         }}
         onPress={() => onChangeAddress(item)}
       >
@@ -123,7 +126,7 @@ export default function AddressListScreen() {
             />
             <IconButton
               icon="delete"
-              iconColor="#D9534F"
+              iconColor={theme.colors.dangerBright || '#D9534F'}
               onPress={() => setConfirm({ visible: true, item })}
             />
           </View>
@@ -149,9 +152,9 @@ export default function AddressListScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <Appbar.Header style={{ backgroundColor: palette.accent }}>
-        <Appbar.BackAction color="white" onPress={() => router.back()} />
-        <Appbar.Content title="Địa chỉ của tôi" color="white" />
+      <Appbar.Header style={{ backgroundColor: "transparent" }}>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title="Địa chỉ của tôi" />
       </Appbar.Header>
 
       {loading ? (
@@ -188,7 +191,7 @@ export default function AddressListScreen() {
           backgroundColor: addresses.length >= 5 ? "#CCC" : palette.accent,
           paddingVertical: 8,
         }}
-        labelStyle={{ color: "white", fontWeight: "600", fontSize: 16 }}
+        labelStyle={{ color: theme.colors.onPrimary, fontWeight: "600", fontSize: 16 }}
       >
         Thêm địa chỉ
       </Button>
@@ -197,19 +200,19 @@ export default function AddressListScreen() {
         <Dialog
           visible={confirm.visible}
           onDismiss={() => setConfirm({ visible: false, item: null })}
-          style={{ borderRadius: 10 }}
+          style={{ borderRadius: 14, backgroundColor: palette.card }}
         >
-          <Dialog.Title style={{ color: palette.textPrimary }}>Xóa địa chỉ?</Dialog.Title>
-          <Dialog.Content>
+          <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Xóa địa chỉ?</Dialog.Title>
+          <Dialog.Content style={{ paddingTop: 0 }}>
             <Text style={{ color: palette.textSecondary }}>
               Bạn có chắc chắn muốn xóa địa chỉ này?
             </Text>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setConfirm({ visible: false, item: null })}>
+          <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+            <Button onPress={() => setConfirm({ visible: false, item: null })} style={{ borderRadius: 10 }}>
               Hủy
             </Button>
-            <Button textColor="#D9534F" onPress={confirmDelete}>
+            <Button textColor={theme.colors.dangerBright || '#D9534F'} onPress={confirmDelete} style={{ borderRadius: 10 }}>
               Xóa
             </Button>
           </Dialog.Actions>

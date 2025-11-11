@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { theme as designTheme } from '../styles';
 import { useThemeStore } from '../store/themeStore';
 import { lightTheme, darkTheme } from '../config/theme';
 import Toast from 'react-native-toast-message';
@@ -12,20 +15,30 @@ export default function RootLayout() {
   useFrameworkReady();
   const { isDarkMode } = useThemeStore();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  if (!fontsLoaded) return null;
 
   return (
-    <PaperProvider theme={theme}>
-      <LoadingProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="auth" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="product/[id]" />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        <Toast />
-      </LoadingProvider>
-    </PaperProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <LoadingProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="auth" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="product/[id]" />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+          <Toast />
+        </LoadingProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
