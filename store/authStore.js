@@ -174,7 +174,6 @@ export const useAuthStore = create((set, get) => ({
       throw error;
     }
   },
-
   loginWithGoogle: async (googleData) => {
     set({ loading: true });
     try {

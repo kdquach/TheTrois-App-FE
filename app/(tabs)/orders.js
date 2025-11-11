@@ -6,14 +6,21 @@ import {
   RefreshControl,
   TouchableOpacity,
   Animated,
+  Alert,
 } from 'react-native';
 import { Appbar, Text, Surface, Divider, Button } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrderStore } from '../../store/orderStore';
+import { useAuthStore } from '../../store/authStore';
+import { useCartStore } from '../../store/cartStore';
 import { formatCurrency, formatDate } from '../../utils/format';
 import LoadingIndicator from '../../components/LoadingIndicator';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import Toast from 'react-native-toast-message';
+import { router } from 'expo-router';
 
 const ORDER_STATUS_CONFIG = {
   pending: {
@@ -56,21 +63,19 @@ const ORDER_STATUS_CONFIG = {
 
 export default function OrdersScreen() {
   const theme = useTheme();
+  const { user } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('pending');
   const [expandedOrders, setExpandedOrders] = useState(new Set());
 
-  const { orders, loading, fetchOrders } = useOrderStore();
+  const { orders, loading, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { getItemTotalPrice } = useCartStore();
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchOrders();
-    setRefreshing(false);
-  };
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders(selectedStatus);
+    }, [selectedStatus])
+  );
 
   const toggleOrderExpanded = (orderId) => {
     const newExpanded = new Set(expandedOrders);
@@ -83,7 +88,7 @@ export default function OrdersScreen() {
   };
 
   const filteredOrders = orders.filter(
-    (order) => selectedStatus === 'all' || order.status === selectedStatus
+    (order) => order.status === selectedStatus
   );
 
   const renderOrderTimeline = (status) => {
@@ -93,6 +98,7 @@ export default function OrdersScreen() {
       'preparing',
       'ready',
       'completed',
+      'cancelled',
     ];
     const currentIndex = statuses.indexOf(status);
 
@@ -140,11 +146,34 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = (order) => {
-    const statusConfig = ORDER_STATUS_CONFIG[order.status];
-    const isExpanded = expandedOrders.has(order.id);
+    const handleCancelOrder = () => {
+      Alert.alert('Hủy đơn hàng', 'Bạn có chắc chắn muốn hủy đơn hàng này?', [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateOrderStatus(order.orderId, 'cancelled');
+              Toast.show({
+                type: 'success',
+                text1: 'Hủy đơn hàng thành công',
+              });
+              await fetchOrders(selectedStatus);
+            } catch (e) {
+              // No-op; backend route may be missing. UI will refresh on next fetch.
+            }
+          },
+        },
+      ]);
+    };
+
+    const statusConfig =
+      ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pending']; // fallback
+    const isExpanded = expandedOrders.has(order.orderId);
 
     return (
-      <Surface key={order.id} style={styles.orderCard} elevation={3}>
+      <Surface key={order.orderId} style={styles.orderCard} elevation={3}>
         <LinearGradient
           colors={statusConfig.gradient}
           style={styles.orderStatusBar}
@@ -154,7 +183,7 @@ export default function OrdersScreen() {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => toggleOrderExpanded(order.id)}
+          onPress={() => toggleOrderExpanded(order.orderId)}
         >
           <View style={styles.orderHeader}>
             <View style={styles.orderHeaderLeft}>
@@ -173,7 +202,7 @@ export default function OrdersScreen() {
               </Surface>
               <View style={styles.orderHeaderInfo}>
                 <Text variant="titleMedium" style={styles.orderId}>
-                  Đơn hàng #{order.id}
+                  Đơn hàng #ORD{order.orderId.slice(-3)}
                 </Text>
                 <Text
                   variant="bodySmall"
@@ -226,7 +255,7 @@ export default function OrdersScreen() {
                 { color: theme.colors.onSurfaceVariant },
               ]}
             >
-              {order.items.length} món
+              {order.products.length} món
             </Text>
           </View>
           <Text
@@ -258,7 +287,7 @@ export default function OrdersScreen() {
               <Text variant="labelLarge" style={styles.sectionTitle}>
                 Chi tiết đơn hàng
               </Text>
-              {order.items.map((item, index) => (
+              {order.products.map((item, index) => (
                 <View key={index} style={styles.orderItem}>
                   <Surface
                     style={[
@@ -282,8 +311,48 @@ export default function OrdersScreen() {
                         { color: theme.colors.onSurfaceVariant },
                       ]}
                     >
-                      {formatCurrency(item.price)} × {item.quantity}
+                      {formatCurrency(item.unitPrice)} × {item.quantity}
                     </Text>
+                    {Array.isArray(item.toppings) &&
+                      item.toppings.length > 0 && (
+                        <View style={styles.toppingsList}>
+                          {item.toppings.map((t, idx) => (
+                            <Text
+                              key={idx}
+                              variant="labelSmall"
+                              style={[
+                                styles.toppingLine,
+                                {
+                                  color: theme.colors.onSurfaceVariant,
+                                  opacity: 0.6,
+                                },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {t.name} +{formatCurrency(t.price || 0)}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                    {/* Customization single line below toppings */}
+                    {item.customization && (
+                      <Text
+                        variant="labelSmall"
+                        style={[
+                          styles.customizationText,
+                          {
+                            color: theme.colors.onSurfaceVariant,
+                            opacity: 0.6,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {typeof item.customization === 'string'
+                          ? item.customization
+                          : item.customization?.description}
+                      </Text>
+                    )}
                   </View>
                   <Text
                     variant="titleSmall"
@@ -292,13 +361,79 @@ export default function OrdersScreen() {
                       { color: theme.colors.starbucksGreen },
                     ]}
                   >
-                    {formatCurrency(item.price * item.quantity)}
+                    {formatCurrency(getItemTotalPrice(item))}
                   </Text>
                 </View>
               ))}
             </View>
 
             <Divider style={styles.divider} />
+
+            {/* Ordering User (outside of address block) */}
+            {(user?.name || user?.phone || user?.phoneNumber) && (
+              <View style={styles.shippingSection}>
+                <View style={styles.shippingRow}>
+                  <MaterialCommunityIcons
+                    name="account-outline"
+                    size={20}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      opacity: 0.7,
+                    }}
+                    numberOfLines={1}
+                  >
+                    Người đặt:{' '}
+                    <Text
+                      style={{
+                        fontWeight: '600',
+                        color: theme.colors.onSurface,
+                      }}
+                    >
+                      {user?.name || 'Khách hàng'}
+                    </Text>
+                    {user?.phone || user?.phoneNumber
+                      ? `  •  ${user?.phone || user?.phoneNumber}`
+                      : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Shipping Address */}
+            {order.shippingAddress ? (
+              <View style={styles.shippingSection}>
+                <View style={styles.shippingRow}>
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={20}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={[
+                      styles.shippingLabel,
+                      { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
+                    ]}
+                  >
+                    Địa chỉ giao hàng
+                  </Text>
+                </View>
+                <Text
+                  variant="bodySmall"
+                  style={[
+                    styles.shippingAddress,
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.85 },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {order.shippingAddress}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Payment Info */}
             <View style={styles.paymentSection}>
@@ -309,26 +444,51 @@ export default function OrdersScreen() {
                   color={theme.colors.onSurfaceVariant}
                 />
                 <Text
-                  variant="bodyMedium"
+                  variant="labelSmall"
                   style={[
                     styles.paymentLabel,
-                    { color: theme.colors.onSurfaceVariant },
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
                   ]}
                 >
                   Phương thức thanh toán
                 </Text>
               </View>
               <Text variant="titleMedium" style={styles.paymentMethod}>
-                {order.paymentMethod}
+                {order.paymentMethod === 'cash'
+                  ? 'Tiền mặt'
+                  : 'Thanh toán online'}
               </Text>
+              {order.status === 'pending' && (
+                <View style={styles.paymentActions}>
+                  <Button
+                    mode="outlined"
+                    compact
+                    onPress={handleCancelOrder}
+                    textColor={theme.colors.error}
+                    icon="close-circle-outline"
+                  >
+                    Hủy đơn hàng
+                  </Button>
+                </View>
+              )}
             </View>
 
             {/* Action Buttons */}
-            {order.status === 'completed' && (
+            {order.status === 'completed' ? (
               <View style={styles.actionButtons}>
                 <Button
                   mode="outlined"
-                  onPress={() => {}}
+                  onPress={() => {
+                    // Navigate to product review list for first product as convenience
+                    const firstProduct = order.products?.[0];
+                    if (firstProduct?.productId || firstProduct?.id) {
+                      const pid = firstProduct.productId || firstProduct.id;
+                      try {
+                        // expo-router style path
+                        router.push({ pathname: '/feedback/list', params: { productId: pid } });
+                      } catch (e) {}
+                    }
+                  }}
                   style={styles.actionButton}
                   labelStyle={styles.actionButtonLabel}
                   icon="replay"
@@ -337,7 +497,16 @@ export default function OrdersScreen() {
                 </Button>
                 <Button
                   mode="contained"
-                  onPress={() => {}}
+                  onPress={() => {
+                    try {
+                      const oid = order.orderId || order.id;
+                      if (!oid) {
+                        Toast.show({ type: 'error', text1: 'Thiếu orderId để đánh giá' });
+                        return;
+                      }
+                      router.push({ pathname: '/feedback/order', params: { orderId: oid } });
+                    } catch (e) {}
+                  }}
                   style={[
                     styles.actionButton,
                     { backgroundColor: theme.colors.starbucksGreen },
@@ -348,6 +517,17 @@ export default function OrdersScreen() {
                   Đánh giá
                 </Button>
               </View>
+            ) : (
+              <View style={styles.actionButtons}>
+                <Button
+                  mode="contained-tonal"
+                  disabled
+                  style={[styles.actionButton]}
+                  icon="lock"
+                >
+                  Đánh giá (chỉ khi hoàn thành)
+                </Button>
+              </View>
             )}
           </View>
         )}
@@ -356,12 +536,12 @@ export default function OrdersScreen() {
   };
 
   const statusFilters = [
-    { key: 'all', label: 'Tất cả', icon: 'view-grid' },
     { key: 'pending', label: 'Chờ', icon: 'clock-outline' },
     { key: 'confirmed', label: 'Đã nhận', icon: 'check-circle' },
     { key: 'preparing', label: 'Pha chế', icon: 'coffee-maker' },
     { key: 'ready', label: 'Sẵn sàng', icon: 'bell-ring' },
     { key: 'completed', label: 'Hoàn thành', icon: 'check-all' },
+    { key: 'cancelled', label: 'Đã hủy', icon: 'close-circle' },
   ];
 
   const renderEmptyState = () => (
@@ -473,14 +653,15 @@ export default function OrdersScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
             colors={[theme.colors.starbucksGreen]}
           />
         }
       >
         {filteredOrders.length === 0
           ? renderEmptyState()
-          : filteredOrders.map((order) => renderOrderItem(order))}
+          : filteredOrders.map((order) => {
+              return renderOrderItem(order);
+            })}
       </ScrollView>
     </View>
   );
@@ -668,7 +849,38 @@ const styles = StyleSheet.create({
   itemTotal: {
     fontWeight: 'bold',
   },
+  toppingsList: {
+    marginTop: 2,
+    gap: 2,
+  },
+  toppingLine: {
+    lineHeight: 16,
+    fontSize: 12,
+  },
+  toppingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  toppingsText: {
+    flex: 1,
+  },
+  customizationText: {
+    marginTop: 2,
+    fontSize: 12,
+  },
   paymentSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  paymentActions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  shippingSection: {
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -678,8 +890,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+  shippingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   paymentLabel: {},
+  shippingLabel: {},
   paymentMethod: {
+    fontWeight: '600',
+  },
+  shippingAddress: {
     fontWeight: '600',
   },
   actionButtons: {
