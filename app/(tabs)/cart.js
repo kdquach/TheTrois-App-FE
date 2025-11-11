@@ -98,6 +98,8 @@ export default function CartScreen() {
     ]
       .filter(Boolean)
       .join(', ');
+      
+    console.log("đây là item",items);
 
     const products = items.map((item) => ({
       productId: item.productId?._id || item.productId,

@@ -18,9 +18,10 @@ export default function StarRating({ value = 0, size = 24, onChange, editable = 
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons
-              name={filled ? 'star' : 'star-outline'}
+              name={filled ? 'star' : 'star'}
               size={size}
-              color={filled ? theme.colors.starbucksGold : theme.colors.onSurfaceVariant}
+              color={filled ? (theme.colors.starbucksGold || '#FFC107') : '#D1D5DB'}
+              style={{ opacity: filled ? 1 : 0.35 }}
             />
           </TouchableOpacity>
         );

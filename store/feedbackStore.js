@@ -70,6 +70,10 @@ export const useFeedbackStore = create((set, get) => ({
   fetchReplies: async (feedbackId, params = {}) => {
     const data = await feedbackApi.getReplies(feedbackId, params);
     const list = Array.isArray(data) ? data : (data.results || data.data || []);
+    console.log('[fetchReplies] feedbackId:', feedbackId, 'count:', list.length);
+    if (list.length) {
+      console.log('[fetchReplies] first reply sample:', list[0]);
+    }
     set((state) => ({ replies: { ...state.replies, [feedbackId]: list } }));
     return list;
   },
