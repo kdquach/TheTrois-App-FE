@@ -25,7 +25,7 @@ import PaymentMethodSelector from '../checkout/PaymentMethodSelector';
 import { useAuthStore } from '../../store/authStore';
 import { useAddressStore } from '../../store/addressStore';
 import { useOrderStore } from '../../store/orderStore';
-import EditCartItemModal from './EditCartItemModal';
+import EditCartItemModal from '../cart/EditCartItemModal';
 
 const { width } = Dimensions.get('window');
 
