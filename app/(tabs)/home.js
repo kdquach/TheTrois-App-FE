@@ -1,32 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   RefreshControl,
   Dimensions,
+  Image,
 } from 'react-native';
-import {
-  Appbar,
-  Card,
-  Text,
-  Button,
-  Chip,
-  Searchbar,
-  Surface,
-  Divider,
-} from 'react-native-paper';
+import { Text, Button, Chip, Surface } from 'react-native-paper';
+import { SearchBar } from '@rneui/themed';
 import { TouchableOpacity } from 'react-native';
 import { useTheme } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useProductStore } from '../../store/productStore';
 import { useCartStore } from '../../store/cartStore';
 import { useThemeStore } from '../../store/themeStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatCurrency } from '../../utils/format';
 import Toast from 'react-native-toast-message';
 import LoadingIndicator from '../../components/LoadingIndicator';
+import Icon from '../../components/Icon';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
@@ -34,12 +27,15 @@ const cardWidth = (width - 48) / 2;
 export default function HomeScreen() {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  // sticky dropdown removed in favor of native stickyHeaderIndices
 
   const { products, categories, loading, fetchProducts } = useProductStore();
   const { addToCart, loading: cartLoading } = useCartStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
+  const { user } = useAuthStore();
 
   useEffect(() => {
     fetchProducts();
@@ -83,11 +79,17 @@ export default function HomeScreen() {
     });
   };
 
+  const getSales = (p) => {
+    return (
+      p?.sales || p?.sold || p?.orderCount || p?.orders || p?.totalSold || 0
+    );
+  };
+
   const renderProduct = (product, index) => (
     <Surface
       key={product.id}
       style={[styles.productCard, { width: cardWidth }]}
-      elevation={3}
+      elevation={0}
     >
       <TouchableOpacity
         activeOpacity={0.7}
@@ -99,71 +101,33 @@ export default function HomeScreen() {
       >
         <View style={styles.card}>
           <View style={styles.imageContainer}>
-            <Card.Cover
-              source={{ uri: product.image }}
-              style={styles.productImage}
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0, 0, 0, 0.7)']}
-              style={styles.imageOverlay}
-            />
-            <View style={styles.productBadges}>
-              <Surface
-                style={[
-                  styles.priceBadge,
-                  { backgroundColor: theme.colors.starbucksGold },
-                ]}
-                elevation={2}
-              >
-                <Text variant="labelSmall" style={styles.priceText}>
-                  {formatCurrency(product.price)}
-                </Text>
-              </Surface>
-            </View>
+            <Image source={{ uri: product.image }} style={styles.productImage} />
+            {getSales(product) > 50 ? (
+              <View style={styles.badgeTopLeft}>
+                <Text style={styles.badgeText}>Bán chạy</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleAddToCart(product);
+              }}
+              style={[styles.fabAdd, { backgroundColor: theme.colors.primary }]}
+            >
+              <Icon name="Plus" size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
           <View style={styles.cardContent}>
             <Text
-              variant="titleSmall"
               style={[styles.productName, { color: theme.colors.onSurface }]}
               numberOfLines={1}
             >
               {product.name}
             </Text>
-            <View style={styles.productRating}>
-              <MaterialCommunityIcons
-                name="star"
-                size={14}
-                color={theme.colors.starbucksGold}
-              />
-              <Text
-                variant="labelSmall"
-                style={[
-                  styles.ratingText,
-                  { color: theme.colors.onSurfaceVariant },
-                ]}
-              >
-                4.8 (120+)
-              </Text>
-            </View>
-          </View>
-          <View style={styles.cardActions}>
-            <Button
-              mode="contained"
-              onPress={(e) => {
-                e.stopPropagation();
-                handleAddToCart(product);
-              }}
-              disabled={cartLoading}
-              style={[
-                styles.addButton,
-                { backgroundColor: theme.colors.starbucksGreen },
-              ]}
-              labelStyle={styles.addButtonLabel}
-              icon="plus-circle"
-              compact
-            >
-              Thêm vào giỏ
-            </Button>
+            <Text style={[styles.price, { color: theme.colors.onSurface }]}>
+              {formatCurrency(product.price)}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -182,173 +146,149 @@ export default function HomeScreen() {
     );
   }
 
-  return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      {/* Hero Section với Starbucks style */}
-      <LinearGradient
-        colors={[theme.colors.starbucksGreen, '#2E7D32']}
-        style={styles.heroSection}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContainer}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text variant="headlineSmall" style={styles.welcomeText}>
-                Chào buổi sáng! ☀️
-              </Text>
-              <Text variant="titleMedium" style={styles.headerSubtitle}>
-                Khám phá menu trà sữa đặc biệt
-              </Text>
-            </View>
-            <Surface style={styles.themeToggle} elevation={2}>
-              <Button
-                icon={isDarkMode ? 'weather-sunny' : 'weather-night'}
-                mode="text"
-                onPress={toggleTheme}
-                textColor="#FFFFFF"
-                compact
-              />
-            </Surface>
-          </View>
+  // Greeting helper
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 11) return 'Chào buổi sáng';
+    if (h < 13) return 'Chào buổi trưa';
+    if (h < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  };
 
-          {/* Featured Offer */}
-          <Surface style={styles.offerCard} elevation={3}>
-            <LinearGradient
-              colors={[theme.colors.starbucksGold, '#B8860B']}
-              style={styles.offerGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+  const displayName = () => {
+    return (
+      user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'bạn')
+    );
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Fixed Greeting/Search Header (outside ScrollView) */}
+      <View style={[styles.fixedHeader, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.content, styles.fixedInner]}>
+          <View style={styles.greetingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greetingText}>
+                {greeting()}
+              </Text>
+              <Text style={styles.greetingName}>{displayName()}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.searchButton, { borderColor: theme.colors.outline }]}
+              onPress={() => setSearchOpen(prev => !prev)}
             >
-              <View style={styles.offerContent}>
-                <MaterialCommunityIcons
-                  name="star-circle"
-                  size={24}
-                  color="#FFFFFF"
-                />
-                <View style={styles.offerText}>
-                  <Text variant="titleSmall" style={styles.offerTitle}>
-                    Ưu đãi đặc biệt
-                  </Text>
-                  <Text variant="bodySmall" style={styles.offerDescription}>
-                    Giảm 20% cho đơn hàng đầu tiên
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </Surface>
+              <Icon name="Search" size={18} color={theme.colors.onSurface} />
+            </TouchableOpacity>
+          </View>
+          {searchOpen && (
+            <SearchBar
+              platform="android"
+              placeholder="Tìm kiếm sản phẩm..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              lightTheme
+              containerStyle={styles.rneSearchContainer}
+              inputContainerStyle={styles.rneSearchInputContainer}
+              inputStyle={styles.rneSearchInput}
+              searchIcon={{ size: 18 }}
+              clearIcon={{ size: 16 }}
+              onClear={() => setSearchOpen(false)}
+              autoFocus
+            />
+          )}
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[theme.colors.starbucksGreen]}
-            tintColor={theme.colors.starbucksGreen}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
         showsVerticalScrollIndicator={false}
         style={styles.scrollContainer}
+        stickyHeaderIndices={[1]}
       >
-        <View style={styles.content}>
-          <Surface style={styles.searchContainer} elevation={1}>
-            <Searchbar
-              placeholder="Tìm kiếm trà sữa yêu thích..."
-              onChangeText={setSearchQuery}
-              value={searchQuery}
-              style={styles.searchbar}
-              iconColor={theme.colors.primary}
-              placeholderTextColor={theme.colors.onSurfaceVariant}
-            />
-          </Surface>
-
-          <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="tag-outline"
-              size={20}
-              color={theme.colors.primary}
-            />
-            <Text
-              variant="titleMedium"
-              style={[
-                styles.sectionTitle,
-                { color: theme.colors.onBackground },
-              ]}
-            >
-              Danh mục
-            </Text>
-          </View>
-
+        {/* Carousel (scrolls away; sits under fixed header) */}
+        <View style={[styles.content, styles.carouselWrapper]}>
           <ScrollView
             horizontal
+            pagingEnabled
             showsHorizontalScrollIndicator={false}
-            style={styles.categoriesContainer}
-            contentContainerStyle={styles.categoriesContent}
+            style={styles.carousel}
           >
-            <Chip
-              selected={selectedCategory === 'all'}
-              onPress={() => setSelectedCategory('all')}
-              style={[
-                styles.categoryChip,
-                selectedCategory === 'all' && {
-                  backgroundColor: theme.colors.primaryContainer,
-                },
-              ]}
-              textStyle={
-                selectedCategory === 'all'
-                  ? { color: theme.colors.primary }
-                  : {}
-              }
+            <Image source={require('../../assets/images/welcome-background.jpg')} style={styles.carouselImage} />
+            <Image source={require('../../assets/images/thetrois-logo.jpg')} style={styles.carouselImage} />
+          </ScrollView>
+        </View>
+
+        {/* Sticky 2: Categories row */}
+        <View style={[styles.stickyHeader, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.content, styles.stickyInner]}>
+            <View style={styles.sectionHeader}>
+              <Icon name="Tags" size={18} color={theme.colors.primary} />
+              <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>Danh mục</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoriesContainer}
+              contentContainerStyle={styles.categoriesContent}
             >
-              Tất cả
-            </Chip>
-            {categories.map((category) => (
               <Chip
-                key={category.id}
-                selected={selectedCategory === category.id}
-                onPress={() => setSelectedCategory(category.id)}
+                selected={selectedCategory === 'all'}
+                onPress={() => setSelectedCategory('all')}
                 style={[
                   styles.categoryChip,
-                  selectedCategory === category.id && {
+                  selectedCategory === 'all' && {
                     backgroundColor: theme.colors.primaryContainer,
                   },
                 ]}
                 textStyle={
-                  selectedCategory === category.id
+                  selectedCategory === 'all'
                     ? { color: theme.colors.primary }
                     : {}
                 }
               >
-                {category.name}
+                Tất cả
               </Chip>
-            ))}
-          </ScrollView>
+              {categories.map((category) => (
+                <Chip
+                  key={category.id}
+                  selected={selectedCategory === category.id}
+                  onPress={() => setSelectedCategory(category.id)}
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === category.id && {
+                      backgroundColor: theme.colors.primaryContainer,
+                    },
+                  ]}
+                  textStyle={
+                    selectedCategory === category.id
+                      ? { color: theme.colors.primary }
+                      : {}
+                  }
+                >
+                  {category.name}
+                </Chip>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
 
+        {/* Products content */}
+        <View style={styles.content}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="cup"
-              size={20}
-              color={theme.colors.primary}
-            />
-            <Text
-              variant="titleMedium"
-              style={[
-                styles.sectionTitle,
-                { color: theme.colors.onBackground },
-              ]}
-            >
+            <Icon name="CupSoda" size={18} color={theme.colors.primary} />
+            <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
               Sản phẩm ({filteredProducts.length})
             </Text>
           </View>
-
           <View style={styles.productsGrid}>
-            {filteredProducts.map((product, index) =>
-              renderProduct(product, index)
-            )}
+            {filteredProducts.map((product, index) => renderProduct(product, index))}
           </View>
         </View>
       </ScrollView>
@@ -360,64 +300,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Starbucks-style Hero Section
-  heroSection: {
-    paddingTop: 50,
-    paddingBottom: 20,
+  fixedHeader: {
+    paddingTop: 20,
+    zIndex: 20,
+    elevation: 0,
   },
-  headerContainer: {
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  welcomeText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  themeToggle: {
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  offerCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 10,
-  },
-  offerGradient: {
-    padding: 16,
-  },
-  offerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  offerText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  offerTitle: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  offerDescription: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 12,
+  fixedInner: {
+    paddingBottom: 0,
   },
   scrollContainer: {
     flex: 1,
-    marginTop: -10,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
@@ -428,23 +321,61 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   content: {
-    padding: 20,
-    paddingTop: 30,
+    padding: 16,
   },
-  searchContainer: {
-    marginBottom: 24,
-    borderRadius: 25,
-    overflow: 'hidden',
-    backgroundColor: '#F8F8F8',
+  carouselWrapper: {
+    paddingTop: 8,
   },
-  searchbar: {
-    elevation: 0,
-    backgroundColor: 'transparent',
-    borderRadius: 25,
-    paddingHorizontal: 8,
+  stickyHeader: {
+    zIndex: 20,
   },
-  searchInput: {
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  greetingText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  greetingName: {
     fontSize: 16,
+    fontWeight: '700',
+  },
+  searchButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eee',
+  },
+  searchOverlay: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  rneSearchContainer: {
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
+    padding: 0,
+    margin: 0,
+  },
+  rneSearchInputContainer: {
+    backgroundColor: '#fff',
+    height: 32,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    borderWidth: 0,
+  },
+  rneSearchInput: {
+    fontSize: 14,
+    padding: 0,
+    margin: 0,
+    lineHeight: 18,
   },
   sectionContainer: {
     marginBottom: 28,
@@ -452,20 +383,30 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    marginLeft: 10,
-    fontWeight: 'bold',
-    fontSize: 18,
+    marginLeft: 8,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  carousel: {
+    height: 140,
+    borderRadius: 12,
+  },
+  carouselImage: {
+    width: width - 32,
+    height: 140,
+    borderRadius: 12,
+    marginRight: 12,
   },
   categoriesContent: {
-    paddingRight: 20,
-    gap: 12,
+    paddingRight: 16,
+    gap: 10,
   },
   categoryChip: {
     borderRadius: 25,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     backgroundColor: '#F5F5F5',
   },
   categoryLabel: {
@@ -480,10 +421,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   productCard: {
-    borderRadius: 16,
-    marginBottom: 16,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    borderWidth: 0,
+    shadowOpacity: 0,
   },
   card: {
     backgroundColor: 'transparent',
@@ -493,64 +433,43 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   productImage: {
-    height: 160,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    height: cardWidth,
+    width: '100%',
+    borderRadius: 8,
   },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  productBadges: {
+  badgeTopLeft: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    left: 10,
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  priceBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  priceText: {
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontSize: 12,
+  fabAdd: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardContent: {
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   productName: {
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  productDescription: {
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  productRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  cardActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 0,
-  },
-  addButton: {
-    borderRadius: 25,
-    paddingVertical: 4,
-  },
-  addButtonLabel: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    marginBottom: 4,
+    fontSize: 14,
   },
+  price: { fontWeight: '700', marginBottom: 6 },
 });
