@@ -26,6 +26,16 @@ export default function FeedbackListScreen() {
    const theme = useTheme();
    const { productId } = useLocalSearchParams();
    const { products } = useProductStore();
+   // Palette giống phần địa chỉ
+   const palette = {
+      background: '#FAF9F6',
+      card: '#FFFFFF',
+      accent: '#A3C9A8',
+      beige: '#E9E3D5',
+      textPrimary: '#3E3B32',
+      textSecondary: '#6B675F',
+      danger: '#D9534F',
+   };
    const {
       fetchFeedbacks,
       list,
@@ -55,12 +65,24 @@ export default function FeedbackListScreen() {
    const [replyTexts, setReplyTexts] = useState({}); // fid -> text
    const [editingReply, setEditingReply] = useState(null); // { fid, reply }
    const [editingReplyText, setEditingReplyText] = useState('');
+   const [confirmDeleteReply, setConfirmDeleteReply] = useState(null); // { fid, rid }
 
    useEffect(() => {
       if (productId) {
          fetchFeedbacks({ productId });
       }
    }, [productId]);
+
+   // Auto-fetch replies for each feedback so they appear without sending a new reply
+   useEffect(() => {
+      if (!list || list.length === 0) return;
+      list.forEach((fb) => {
+         const fid = fb?.id || fb?._id;
+         if (fid && !replies[fid]) {
+            fetchReplies(fid);
+         }
+      });
+   }, [list, replies]);
 
    const handleOpenCreate = () => {
       // Chỉ cho phép đánh giá từ đơn hàng đã mua: điều hướng về Orders (Hoàn thành)
@@ -139,6 +161,7 @@ export default function FeedbackListScreen() {
       try {
          await deleteReply(fid, rid);
          Toast.show({ type: 'success', text1: 'Đã xóa phản hồi' });
+         fetchReplies(fid);
       } catch (e) { }
    };
 
@@ -189,8 +212,6 @@ export default function FeedbackListScreen() {
             const userName = fb.userId?.name || 'Người dùng';
             const avatarUrl = fb.userId?.avatarUrl || fb.userId?.avatar || null;
             const firstLetter = userName.charAt(0).toUpperCase();
-            const createdRaw = fb.createdAt || fb.created_at;
-            const relative = formatRelative(createdRaw) || formatDateShort(createdRaw);
             return (
                <Surface key={fid} style={styles.feedbackCard} elevation={0}>
                   {/* Row 1: avatar + name + menu */}
@@ -213,7 +234,6 @@ export default function FeedbackListScreen() {
                   {/* Row 2: stars + relative time */}
                   <View style={styles.row2}>
                      <StarRating value={fb.rating} size={16} editable={false} />
-                     <Text style={styles.relativeTime}>{relative}</Text>
                   </View>
                   {/* Row 3: content */}
                   {!!fb.content && <Text style={styles.content}>{fb.content}</Text>}
@@ -221,8 +241,6 @@ export default function FeedbackListScreen() {
                   <View style={{ marginTop: 6 }}>
                      {replyList.filter(r => r.isStaffReply).map(r => {
                         const rid = r.id || r._id;
-                        const rCreated = r.createdAt || r.created_at;
-                        const rRel = formatRelative(rCreated) || formatDateShort(rCreated);
                         const rUserName = (r.userId?.name) || 'Cửa hàng';
                         const rAvatar = r.userId?.avatar || r.userId?.avatarUrl || null;
                         const canEditStaff = user && ((r.userId?.id || r.userId?._id || r.userId) && String(r.userId?.id || r.userId?._id || r.userId) === String(user.id || user._id) || (user.role === 'admin' && r.isStaffReply));
@@ -230,7 +248,7 @@ export default function FeedbackListScreen() {
                            <View key={rid} style={styles.staffReplyBubble}>
                               <View style={styles.staffReplyHeader}>
                                  {rAvatar ? <Avatar.Image size={24} source={{ uri: rAvatar }} /> : <Avatar.Text size={24} label={(rUserName || 'S')[0]} />}
-                                 <Text style={styles.staffReplyLabel}>Phản hồi từ cửa hàng • {rRel}</Text>
+                                 <Text style={styles.staffReplyLabel}>{rUserName}</Text>
                                  {canEditStaff && (
                                     <Menu
                                        visible={menuOpenFor === `sr-${rid}`}
@@ -238,7 +256,7 @@ export default function FeedbackListScreen() {
                                        anchor={<IconButton icon="dots-vertical" size={18} onPress={() => setMenuOpenFor(`sr-${rid}`)} />}
                                     >
                                        <Menu.Item onPress={() => onStartEditReply(fid, r)} title="Sửa" leadingIcon="pencil" />
-                                       <Menu.Item onPress={() => onDeleteReply(fid, rid)} title="Xóa" leadingIcon="delete" />
+                                       <Menu.Item onPress={() => { setMenuOpenFor(null); setConfirmDeleteReply({ fid, rid }); }} title="Xóa" leadingIcon="delete" />
                                     </Menu>
                                  )}
                               </View>
@@ -271,7 +289,7 @@ export default function FeedbackListScreen() {
                                        anchor={<IconButton icon="dots-vertical" size={18} onPress={() => setMenuOpenFor(`r-${rid}`)} />}
                                     >
                                        <Menu.Item onPress={() => onStartEditReply(fid, r)} title="Sửa" leadingIcon="pencil" />
-                                       <Menu.Item onPress={() => onDeleteReply(fid, rid)} title="Xóa" leadingIcon="delete" />
+                                       <Menu.Item onPress={() => { setMenuOpenFor(null); setConfirmDeleteReply({ fid, rid }); }} title="Xóa" leadingIcon="delete" />
                                     </Menu>
                                  )}
                               </View>
@@ -303,8 +321,13 @@ export default function FeedbackListScreen() {
 
          {/* Edit feedback dialog */}
          <Portal>
-            <Dialog visible={!!editFb} onDismiss={() => setEditFb(null)}>
-               <Dialog.Title>Sửa đánh giá</Dialog.Title>
+            {/* Edit feedback */}
+            <Dialog
+               visible={!!editFb}
+               onDismiss={() => setEditFb(null)}
+               style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+            >
+               <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Sửa đánh giá</Dialog.Title>
                <Dialog.Content>
                   <StarRating value={editRating} onChange={setEditRating} size={28} />
                   <TextInput
@@ -312,36 +335,89 @@ export default function FeedbackListScreen() {
                      value={editContent}
                      onChangeText={setEditContent}
                      multiline
-                     style={{ marginTop: 8 }}
+                     style={{ marginTop: 12, backgroundColor: '#FFF' }}
+                     outlineStyle={{ borderColor: palette.beige }}
+                     textColor={palette.textPrimary}
                   />
                </Dialog.Content>
-               <Dialog.Actions>
-                  <Button onPress={() => setEditFb(null)}>Hủy</Button>
-                  <Button onPress={saveEdit}>Lưu</Button>
+               <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                  <Button onPress={() => setEditFb(null)} textColor={palette.textSecondary}>Hủy</Button>
+                  <Button
+                     mode="contained"
+                     onPress={saveEdit}
+                     buttonColor={palette.accent}
+                     textColor={palette.textPrimary}
+                     style={{ borderRadius: 8 }}
+                  >Lưu</Button>
                </Dialog.Actions>
             </Dialog>
 
             {/* Confirm delete feedback */}
-            <Dialog visible={!!confirmDelete} onDismiss={() => setConfirmDelete(null)}>
-               <Dialog.Title>Xóa đánh giá?</Dialog.Title>
+            <Dialog
+               visible={!!confirmDelete}
+               onDismiss={() => setConfirmDelete(null)}
+               style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+            >
+               <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Xóa đánh giá?</Dialog.Title>
                <Dialog.Content>
-                  <Text>Bạn có chắc chắn muốn xóa đánh giá này?</Text>
+                  <Text style={{ color: palette.textSecondary }}>Bạn có chắc chắn muốn xóa đánh giá này?</Text>
                </Dialog.Content>
-               <Dialog.Actions>
-                  <Button onPress={() => setConfirmDelete(null)}>Hủy</Button>
-                  <Button onPress={doDelete}>Xóa</Button>
+               <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                  <Button onPress={() => setConfirmDelete(null)} textColor={palette.textSecondary}>Hủy</Button>
+                  <Button onPress={doDelete} textColor={palette.danger}>Xóa</Button>
                </Dialog.Actions>
             </Dialog>
 
-            {/* Edit reply dialog */}
-            <Dialog visible={!!editingReply} onDismiss={() => setEditingReply(null)}>
-               <Dialog.Title>Sửa phản hồi</Dialog.Title>
+            {/* Edit reply */}
+            <Dialog
+               visible={!!editingReply}
+               onDismiss={() => setEditingReply(null)}
+               style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+            >
+               <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Sửa phản hồi</Dialog.Title>
                <Dialog.Content>
-                  <TextInput mode="outlined" value={editingReplyText} onChangeText={setEditingReplyText} multiline />
+                  <TextInput
+                     mode="outlined"
+                     value={editingReplyText}
+                     onChangeText={setEditingReplyText}
+                     multiline
+                     style={{ backgroundColor: '#FFF' }}
+                     outlineStyle={{ borderColor: palette.beige }}
+                     textColor={palette.textPrimary}
+                  />
                </Dialog.Content>
-               <Dialog.Actions>
-                  <Button onPress={() => setEditingReply(null)}>Hủy</Button>
-                  <Button onPress={onSaveEditReply}>Lưu</Button>
+               <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                  <Button onPress={() => setEditingReply(null)} textColor={palette.textSecondary}>Hủy</Button>
+                  <Button
+                     mode="contained"
+                     onPress={onSaveEditReply}
+                     buttonColor={palette.accent}
+                     textColor={palette.textPrimary}
+                     style={{ borderRadius: 8 }}
+                  >Lưu</Button>
+               </Dialog.Actions>
+            </Dialog>
+
+            {/* Confirm delete reply */}
+            <Dialog
+               visible={!!confirmDeleteReply}
+               onDismiss={() => setConfirmDeleteReply(null)}
+               style={{ borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.beige }}
+            >
+               <Dialog.Title style={{ color: palette.textPrimary, fontWeight: '700' }}>Xóa phản hồi?</Dialog.Title>
+               <Dialog.Content>
+                  <Text style={{ color: palette.textSecondary }}>Bạn có chắc chắn muốn xóa phản hồi này?</Text>
+               </Dialog.Content>
+               <Dialog.Actions style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                  <Button onPress={() => setConfirmDeleteReply(null)} textColor={palette.textSecondary}>Hủy</Button>
+                  <Button
+                     onPress={() => {
+                        const ctx = confirmDeleteReply;
+                        setConfirmDeleteReply(null);
+                        if (ctx?.fid && ctx?.rid) onDeleteReply(ctx.fid, ctx.rid);
+                     }}
+                     textColor={palette.danger}
+                  >Xóa</Button>
                </Dialog.Actions>
             </Dialog>
          </Portal>
@@ -407,34 +483,3 @@ const styles = StyleSheet.create({
    },
 
 });
-
-// Relative time helper
-function formatRelative(dateInput) {
-   if (!dateInput) return '';
-   const d = new Date(dateInput);
-   if (isNaN(d)) return '';
-   const now = Date.now();
-   const diffMs = now - d.getTime();
-   const diffH = diffMs / 3600000;
-   const diffD = diffH / 24;
-   if (diffH < 24) return 'Hôm nay';
-   if (diffD < 2) return '1 ngày trước';
-   if (diffD < 7) return `${Math.floor(diffD)} ngày trước`;
-   const diffM = diffD / 30;
-   if (diffM < 2) return '1 tháng trước';
-   if (diffM < 12) return `${Math.floor(diffM)} tháng trước`;
-   const diffY = diffM / 12;
-   if (diffY < 2) return '1 năm trước';
-   return `${Math.floor(diffY)} năm trước`;
-}
-
-// Short date fallback dd/MM/yyyy
-function formatDateShort(dateInput) {
-   if (!dateInput) return '';
-   const d = new Date(dateInput);
-   if (isNaN(d)) return '';
-   const dd = String(d.getDate()).padStart(2, '0');
-   const mm = String(d.getMonth() + 1).padStart(2, '0');
-   const yyyy = d.getFullYear();
-   return `${dd}/${mm}/${yyyy}`;
-}
