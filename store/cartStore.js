@@ -77,6 +77,7 @@ export const useCartStore = create((set, get) => ({
 
   // Tính tổng của từng item theo công thức BE
   getItemTotalPrice: (item) => {
+    console.log("🚀 ~ item:", item)
     const quantity = item.quantity || 1;
     let total = (item.unitPrice || 0) * quantity;
 
