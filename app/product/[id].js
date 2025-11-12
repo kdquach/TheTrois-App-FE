@@ -1,17 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Image, Dimensions } from 'react-native';
-import {
-  Text,
-  Button,
-  Surface,
-  Chip,
-  Divider,
-  RadioButton,
-  Checkbox,
-  IconButton,
-} from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, Dimensions, TouchableOpacity } from 'react-native';
+import { Text, Button, Surface, Chip, Divider, IconButton } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useProductStore } from '../../store/productStore';
@@ -56,8 +46,8 @@ export default function ProductDetailScreen() {
   const product = products.find((p) => p.id === id || p.id === String(id));
 
   const [selectedSize, setSelectedSize] = useState('M');
-  const [iceLevel, setIceLevel] = useState(50); // Number instead of string
-  const [sugarLevel, setSugarLevel] = useState(50); // Number instead of string
+  const [iceLevel, setIceLevel] = useState(50); // Number
+  const [sugarLevel, setSugarLevel] = useState(50); // Number
   const [selectedToppings, setSelectedToppings] = useState([]);
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -128,25 +118,17 @@ export default function ProductDetailScreen() {
         <LoadingIndicator
           type="pulse"
           size={60}
-          color={theme.colors.starbucksGreen}
+          color={theme.colors.primary}
           text="Đang tải sản phẩm..."
         />
       </View>
     );
   }
 
-  const getToppingsInfo = () => {
-    return selectedToppings.map((toppingId) => {
-      const topping = productToppings.find(
-        (t) => (t.id || t._id) === toppingId
-      );
-      return {
-        id: topping?.id || topping?._id || 'Unknown',
-        name: topping?.name || 'Unknown',
-        price: topping?.price || 0,
-      };
-    });
-  };
+  const getToppingsInfo = () => selectedToppings.map(toppingId => {
+    const topping = productToppings.find(t => (t.id || t._id) === toppingId);
+    return { id: topping?.id || topping?._id || 'Unknown', name: topping?.name || 'Unknown', price: topping?.price || 0 };
+  });
 
   const calculateTotalPrice = () => {
     let total = product.price;
@@ -230,10 +212,7 @@ export default function ProductDetailScreen() {
           style={styles.productImage}
           resizeMode="cover"
         />
-        <LinearGradient
-          colors={['transparent', 'rgba(0, 0, 0, 0.8)']}
-          style={styles.imageOverlay}
-        />
+        <View style={styles.imageOverlay} />
 
         {/* Back Button */}
         <Surface style={styles.backButton} elevation={4}>
@@ -255,27 +234,13 @@ export default function ProductDetailScreen() {
           />
         </Surface>
 
-        {/* Product Info Overlay */}
+        {/* Product Info Overlay simplified */}
         <View style={styles.productInfoOverlay}>
-          <Text variant="headlineMedium" style={styles.productTitle}>
-            {product.name}
-          </Text>
+          <Text variant="headlineSmall" style={styles.productTitle}>{product.name}</Text>
           <View style={styles.ratingContainer}>
-            <MaterialCommunityIcons
-              name="star"
-              size={20}
-              color={theme.colors.starbucksGold}
-            />
-            <Text variant="titleMedium" style={styles.ratingText}>
-              {stats.average?.toFixed ? stats.average.toFixed(1) : stats.average}
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={styles.reviewCount}
-              onPress={() => router.push({ pathname: '/feedback/list', params: { productId: product?.id || String(id) } })}
-            >
-              ({stats.count} đánh giá)
-            </Text>
+            <MaterialCommunityIcons name="star" size={18} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.ratingText}>{stats.average?.toFixed ? stats.average.toFixed(1) : stats.average}</Text>
+            <Text variant="bodyMedium" style={styles.reviewCount} onPress={() => router.push({ pathname: '/feedback/list', params: { productId: product?.id || String(id) } })}>({stats.count} đánh giá)</Text>
           </View>
         </View>
       </View>
@@ -283,19 +248,10 @@ export default function ProductDetailScreen() {
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Description */}
-        <Surface style={styles.section} elevation={1}>
+        <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="information"
-              size={24}
-              color={theme.colors.starbucksGreen}
-            />
-            <Text
-              variant="titleLarge"
-              style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
-            >
-              Mô tả
-            </Text>
+            <MaterialCommunityIcons name="information" size={20} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Mô tả</Text>
           </View>
           <Text
             variant="bodyLarge"
@@ -319,211 +275,95 @@ export default function ProductDetailScreen() {
         </Surface>
 
         {/* Size Selection */}
-        <Surface style={styles.section} elevation={1}>
+        <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="cup"
-              size={24}
-              color={theme.colors.starbucksGreen}
-            />
-            <Text
-              variant="titleLarge"
-              style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
-            >
-              Chọn size
-            </Text>
+            <MaterialCommunityIcons name="cup" size={20} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Chọn size</Text>
           </View>
-          <View style={styles.optionsGrid}>
-            {SIZES.map((size) => (
-              <Surface
-                key={size.id}
-                style={[
-                  styles.sizeOption,
-                  selectedSize === size.id && {
-                    backgroundColor: theme.colors.primaryContainer,
-                    borderColor: theme.colors.starbucksGreen,
-                  },
-                ]}
-                elevation={selectedSize === size.id ? 3 : 1}
-              >
-                <Button
-                  onPress={() => setSelectedSize(size.id)}
-                  mode="text"
-                  textColor={
-                    selectedSize === size.id
-                      ? theme.colors.starbucksGreen
-                      : theme.colors.onSurface
-                  }
-                  style={styles.sizeButton}
+          <View style={styles.sizeRow}> 
+            {SIZES.map((s) => {
+              const active = selectedSize === s.id;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  style={[styles.sizeTile, active && styles.sizeTileActive]}
+                  onPress={() => setSelectedSize(s.id)}
+                  activeOpacity={0.85}
                 >
-                  <View style={styles.sizeContent}>
-                    <Text variant="titleMedium" style={styles.sizeLabel}>
-                      {size.label}
-                    </Text>
-                    {size.price > 0 && (
-                      <Text
-                        variant="bodySmall"
-                        style={[
-                          styles.sizePrice,
-                          { color: theme.colors.starbucksGold },
-                        ]}
-                      >
-                        +{formatCurrency(size.price)}
-                      </Text>
-                    )}
-                  </View>
-                </Button>
-              </Surface>
-            ))}
+                  <Text style={[styles.sizeTileLabel, active && styles.sizeTileLabelActive]}>{s.id}</Text>
+                  <Text style={[styles.sizeTileExtra, active && styles.sizeTileExtraActive]}>{s.price > 0 ? `+${formatCurrency(s.price)}` : '+0₫'}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Surface>
 
         {/* Ice Level */}
-        <Surface style={styles.section} elevation={1}>
+        <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="snowflake"
-              size={24}
-              color={theme.colors.starbucksGreen}
-            />
-            <Text
-              variant="titleLarge"
-              style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
-            >
-              Lượng đá
-            </Text>
+            <MaterialCommunityIcons name="snowflake" size={20} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Lượng đá: {iceLevel}%</Text>
           </View>
-          <View style={styles.radioGroup}>
-            {ICE_LEVELS.map((level) => (
-              <Surface key={level.id} style={styles.radioOption} elevation={0}>
-                <RadioButton.Android
-                  value={level.id}
-                  status={iceLevel === level.id ? 'checked' : 'unchecked'}
-                  onPress={() => setIceLevel(level.id)}
-                  color={theme.colors.starbucksGreen}
-                />
-                <Text
-                  variant="bodyLarge"
-                  style={{ color: theme.colors.onSurface }}
-                >
-                  {level.label}
-                </Text>
-              </Surface>
+          <View style={styles.levelButtons}>
+            {[0,50,75,100].map(level => (
+              <Chip
+                key={level}
+                selected={iceLevel === level}
+                onPress={() => setIceLevel(level)}
+                style={[styles.levelChip,{ backgroundColor: '#eee' }, iceLevel === level && { backgroundColor: '#E8F5E9' }]}
+                textStyle={[styles.levelChipText, iceLevel === level && { color: theme.colors.primary, fontWeight: '700' }]}
+              >{level}%</Chip>
             ))}
           </View>
         </Surface>
 
         {/* Sugar Level */}
-        <Surface style={styles.section} elevation={1}>
+        <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="grain"
-              size={24}
-              color={theme.colors.starbucksGreen}
-            />
-            <Text
-              variant="titleLarge"
-              style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
-            >
-              Lượng đường
-            </Text>
+            <MaterialCommunityIcons name="grain" size={20} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Lượng đường: {sugarLevel}%</Text>
           </View>
-          <View style={styles.radioGroup}>
-            {SUGAR_LEVELS.map((level) => (
-              <Surface key={level.id} style={styles.radioOption} elevation={0}>
-                <RadioButton.Android
-                  value={level.id}
-                  status={sugarLevel === level.id ? 'checked' : 'unchecked'}
-                  onPress={() => setSugarLevel(level.id)}
-                  color={theme.colors.starbucksGreen}
-                />
-                <Text
-                  variant="bodyLarge"
-                  style={{ color: theme.colors.onSurface }}
-                >
-                  {level.label}
-                </Text>
-              </Surface>
+          <View style={styles.levelButtons}>
+            {[0,50,70,100].map(level => (
+              <Chip
+                key={level}
+                selected={sugarLevel === level}
+                onPress={() => setSugarLevel(level)}
+                style={[styles.levelChip,{ backgroundColor: '#eee' }, sugarLevel === level && { backgroundColor: '#E8F5E9' }]}
+                textStyle={[styles.levelChipText, sugarLevel === level && { color: theme.colors.primary, fontWeight: '700' }]}
+              >{level}%</Chip>
             ))}
           </View>
         </Surface>
 
         {/* Toppings */}
-        <Surface style={styles.section} elevation={1}>
+        <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons
-              name="food"
-              size={24}
-              color={theme.colors.starbucksGreen}
-            />
-            <Text
-              variant="titleLarge"
-              style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
-            >
-              Thêm topping
-            </Text>
+            <MaterialCommunityIcons name="food" size={20} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Thêm topping</Text>
           </View>
-          <View style={styles.toppingsGrid}>
+          <View style={styles.toppingsColumn}>
             {loadingToppings ? (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <LoadingIndicator
-                  type="pulse"
-                  size={40}
-                  color={theme.colors.starbucksGreen}
-                  text="Đang tải topping..."
-                />
+                <LoadingIndicator type="pulse" size={40} color={theme.colors.primary} text="Đang tải topping..." />
               </View>
             ) : productToppings.length > 0 ? (
-              productToppings.map((topping) => {
+              productToppings.map(topping => {
                 const toppingId = topping.id || topping._id;
+                const active = selectedToppings.includes(toppingId);
                 return (
-                  <Surface
-                    key={topping.id || topping._id}
-                    style={[
-                      styles.toppingOption,
-                      selectedToppings.includes(toppingId) && {
-                        backgroundColor: theme.colors.primaryContainer,
-                        borderColor: theme.colors.starbucksGreen,
-                      },
-                    ]}
-                    elevation={selectedToppings.includes(toppingId) ? 3 : 1}
-                  >
-                    <Checkbox.Android
-                      status={
-                        selectedToppings.includes(toppingId)
-                          ? 'checked'
-                          : 'unchecked'
-                      }
-                      onPress={() => handleToggleTopping(toppingId)}
-                      color={theme.colors.starbucksGreen}
-                    />
-                    <View style={styles.toppingContent}>
-                      <Text
-                        variant="titleSmall"
-                        style={{ color: theme.colors.onSurface }}
-                      >
-                        {topping.name}
-                      </Text>
-                      <Text
-                        variant="bodySmall"
-                        style={[
-                          styles.toppingPrice,
-                          { color: theme.colors.starbucksGold },
-                        ]}
-                      >
-                        +{formatCurrency(topping.price)}
-                      </Text>
-                    </View>
+                  <Surface key={toppingId} style={[styles.toppingItem, active && styles.toppingItemActive]} elevation={0}>
+                    <TouchableOpacity style={styles.toppingInner} onPress={() => handleToggleTopping(toppingId)} activeOpacity={0.85}>
+                      <View style={styles.toppingTexts}>
+                        <Text style={[styles.toppingName, active && styles.toppingNameActive]}>{topping.name}</Text>
+                        <Text style={[styles.toppingPriceText, active && styles.toppingPriceTextActive]}>+{formatCurrency(topping.price)}</Text>
+                      </View>
+                    </TouchableOpacity>
                   </Surface>
                 );
               })
             ) : (
-              <Text
-                variant="bodyMedium"
-                style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}
-              >
-                Sản phẩm này không có topping đi kèm
-              </Text>
+              <Text variant="bodyMedium" style={{ padding: 20, textAlign: 'center', opacity: 0.6 }}>Sản phẩm này không có topping đi kèm</Text>
             )}
           </View>
         </Surface>
@@ -533,75 +373,20 @@ export default function ProductDetailScreen() {
 
       {/* Bottom Bar */}
       <Surface style={styles.bottomBar} elevation={0}>
-        <View style={styles.quantitySection}>
-          <Text
-            variant="titleMedium"
-            style={[styles.quantityLabel, { color: theme.colors.onSurface }]}
-          >
-            Số lượng
-          </Text>
-          <View style={styles.quantityControl}>
-            <Surface style={styles.quantityButton} elevation={2}>
-              <IconButton
-                icon="minus"
-                size={20}
-                iconColor={theme.colors.starbucksGreen}
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-              />
-            </Surface>
-            <Text
-              variant="titleLarge"
-              style={[styles.quantityValue, { color: theme.colors.onSurface }]}
-            >
-              {quantity}
-            </Text>
-            <Surface style={styles.quantityButton} elevation={2}>
-              <IconButton
-                icon="plus"
-                size={20}
-                iconColor={theme.colors.starbucksGreen}
-                onPress={() => setQuantity(quantity + 1)}
-              />
-            </Surface>
+        <View style={styles.bottomTopRow}>
+          <View style={styles.totalColumn}>
+            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={[styles.totalPriceValue, { color: theme.colors.primary }]}>{formatCurrency(calculateTotalPrice())}</Text>
           </View>
+          <Surface style={styles.modalQuantityContainer} elevation={0}>
+            <IconButton icon="minus" size={16} iconColor={theme.colors.onSurface} style={styles.modalQtyBtn} disabled={quantity<=1} onPress={() => setQuantity(Math.max(1, quantity-1))} />
+            <Text style={styles.modalQtyValue}>{quantity}</Text>
+            <IconButton icon="plus" size={16} iconColor={theme.colors.onSurface} style={styles.modalQtyBtn} onPress={() => setQuantity(quantity+1)} />
+          </Surface>
         </View>
-
-        <View style={styles.priceSection}>
-          <View>
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.priceLabel,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              Tổng cộng
-            </Text>
-            <Text
-              variant="headlineSmall"
-              style={[
-                styles.totalPrice,
-                { color: theme.colors.starbucksGreen },
-              ]}
-            >
-              {formatCurrency(calculateTotalPrice())}
-            </Text>
-          </View>
-          <Button
-            mode="contained"
-            onPress={handleAddToCart}
-            disabled={loading}
-            loading={loading} // ← Thêm prop này
-            style={[
-              styles.addToCartButton,
-              { backgroundColor: theme.colors.starbucksGreen },
-            ]}
-            labelStyle={styles.addToCartLabel}
-            icon={loading ? undefined : 'cart-plus'} // Ẩn icon khi loading
-          >
-            Thêm vào giỏ
-          </Button>
-        </View>
+        <Button mode="contained" onPress={handleAddToCart} disabled={loading} loading={loading} style={[styles.addToCartButtonFull,{ backgroundColor: theme.colors.primary }]} labelStyle={styles.addToCartLabel} icon={loading?undefined:'cart-plus'}>
+          Thêm vào giỏ
+        </Button>
       </Surface>
     </View>
   );
@@ -625,6 +410,7 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)'
   },
   backButton: {
     position: 'absolute',
@@ -668,129 +454,56 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 20,
-    padding: 20,
+    padding: 16,
     borderRadius: 16,
+    backgroundColor: '#FFFFFF',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    marginLeft: 12,
-    fontWeight: 'bold',
+    marginLeft: 8,
+    fontWeight: '700',
+    fontSize: 16,
   },
   description: {
     lineHeight: 24,
     marginBottom: 8,
   },
-  optionsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  sizeOption: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-  },
-  sizeButton: {
-    width: '100%',
-  },
-  sizeContent: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  sizeLabel: {
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sizePrice: {
-    fontSize: 12,
-  },
-  radioGroup: {
-    gap: 12,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  toppingsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  toppingOption: {
-    width: (width - 72) / 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  toppingInfo: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  toppingIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  toppingName: {
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  toppingPrice: {
-    fontSize: 12,
-  },
+  sizeRow: { flexDirection: 'row', gap: 10 },
+  sizeTile: { flex: 1, backgroundColor: '#eee', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center' },
+  sizeTileActive: { backgroundColor: '#E8F5E9' },
+  sizeTileLabel: { fontWeight: '700', fontSize: 13, color: '#362415', marginBottom: 2 },
+  sizeTileLabelActive: { color: '#00ac45', fontWeight: '700' },
+  sizeTileExtra: { fontSize: 12, color: '#604c4c' },
+  sizeTileExtraActive: { color: '#00ac45', fontWeight: '700' },
+  levelButtons: { flexDirection: 'row', gap: 10 },
+  levelChip: { flex: 1 },
+  levelChipText: { fontSize: 12 },
+  toppingsColumn: { gap: 12 },
+  toppingItem: { backgroundColor: '#F8F9FA', borderRadius: 12, overflow: 'hidden' },
+  toppingItemActive: { backgroundColor: '#E8F5E9' },
+  toppingInner: { padding: 12 },
+  toppingTexts: { marginLeft: 0 },
+  toppingName: { color: '#362415' },
+  toppingNameActive: { color: '#00ac45', fontWeight: '700' },
+  toppingPriceText: { color: '#604c4c', marginTop: 2 },
+  toppingPriceTextActive: { color: '#00ac45', fontWeight: '700', marginTop: 2 },
   bottomSpacing: {
     height: 20,
   },
-  bottomBar: {
-    padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  quantitySection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  quantityLabel: {
-    fontWeight: '600',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  quantityButton: {
-    borderRadius: 20,
-  },
-  quantityValue: {
-    fontWeight: 'bold',
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  priceSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    marginBottom: 4,
-  },
-  totalPrice: {
-    fontWeight: 'bold',
-  },
-  addToCartButton: {
-    borderRadius: 25,
-    paddingHorizontal: 24,
-  },
+  bottomBar: { padding: 16, borderTopWidth: 1, borderTopColor: '#E0E0E0', backgroundColor: '#FFFFFF', gap: 12 },
+  bottomTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalQuantityContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eeeeee', borderRadius: 18, paddingHorizontal: 6, paddingVertical: 2 },
+  modalQtyBtn: { margin: 0, width: 14, height: 14 },
+  modalQtyValue: { marginHorizontal: 8, minWidth: 14, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#362415' },
+  totalColumn: { },
+  totalLabel: { fontWeight: '600', color: '#362415', marginBottom: 2 },
+  totalPriceValue: { fontWeight: '700', fontSize: 18 },
+  addToCartButton: { borderRadius: 25, paddingHorizontal: 24 },
+  addToCartButtonFull: { marginTop: 4, borderRadius: 25 },
   addToCartLabel: {
     fontSize: 16,
     fontWeight: '600',

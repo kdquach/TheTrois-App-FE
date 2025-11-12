@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { Appbar, Text, Surface, Divider, Button } from 'react-native-paper';
 import { useTheme } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrderStore } from '../../store/orderStore';
 import { useAuthStore } from '../../store/authStore';
@@ -22,43 +21,14 @@ import { useCallback } from 'react';
 import Toast from 'react-native-toast-message';
 import { router } from 'expo-router';
 
+// Simplified status config (no gradients, flatter color approach)
 const ORDER_STATUS_CONFIG = {
-  pending: {
-    label: 'Chờ xác nhận',
-    icon: 'clock-outline',
-    color: '#FF9800',
-    gradient: ['#FFA726', '#FF9800'],
-  },
-  confirmed: {
-    label: 'Đã xác nhận',
-    icon: 'check-circle',
-    color: '#2196F3',
-    gradient: ['#42A5F5', '#2196F3'],
-  },
-  preparing: {
-    label: 'Đang pha chế',
-    icon: 'coffee-maker',
-    color: '#00704A',
-    gradient: ['#00906A', '#00704A'],
-  },
-  ready: {
-    label: 'Sẵn sàng lấy',
-    icon: 'bell-ring',
-    color: '#D4AF37',
-    gradient: ['#E0C44E', '#D4AF37'],
-  },
-  completed: {
-    label: 'Hoàn thành',
-    icon: 'check-all',
-    color: '#4CAF50',
-    gradient: ['#66BB6A', '#4CAF50'],
-  },
-  cancelled: {
-    label: 'Đã hủy',
-    icon: 'close-circle',
-    color: '#F44336',
-    gradient: ['#EF5350', '#F44336'],
-  },
+  pending: { label: 'Chờ xác nhận', icon: 'clock-outline', color: '#FF9800' },
+  confirmed: { label: 'Đã xác nhận', icon: 'check-circle', color: '#2196F3' },
+  preparing: { label: 'Đang pha chế', icon: 'coffee-maker', color: '#00ac45' },
+  ready: { label: 'Sẵn sàng lấy', icon: 'bell-ring', color: '#D4AF37' },
+  completed: { label: 'Hoàn thành', icon: 'check-all', color: '#4CAF50' },
+  cancelled: { label: 'Đã hủy', icon: 'close-circle', color: '#F44336' },
 };
 
 export default function OrdersScreen() {
@@ -173,12 +143,12 @@ export default function OrdersScreen() {
     const isExpanded = expandedOrders.has(order.orderId);
 
     return (
-      <Surface key={order.orderId} style={styles.orderCard} elevation={3}>
-        <LinearGradient
-          colors={statusConfig.gradient}
-          style={styles.orderStatusBar}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+      <Surface key={order.orderId} style={styles.orderCard} elevation={0}>
+        <View
+          style={[
+            styles.orderStatusBar,
+            { backgroundColor: `${statusConfig.color}` },
+          ]}
         />
 
         <TouchableOpacity
@@ -258,10 +228,10 @@ export default function OrdersScreen() {
               {order.products.length} món
             </Text>
           </View>
-          <Text
-            variant="titleLarge"
-            style={[styles.totalAmount, { color: theme.colors.starbucksGreen }]}
-          >
+                  <Text
+                    variant="titleLarge"
+                    style={[styles.totalAmount, { color: theme.colors.primary }]}
+                  >
             {formatCurrency(order.totalAmount)}
           </Text>
         </View>
@@ -292,9 +262,9 @@ export default function OrdersScreen() {
                   <Surface
                     style={[
                       styles.itemQuantityBadge,
-                      { backgroundColor: theme.colors.starbucksGreen },
+                      { backgroundColor: theme.colors.primary },
                     ]}
-                    elevation={1}
+                    elevation={0}
                   >
                     <Text variant="labelSmall" style={styles.quantityText}>
                       {item.quantity}
@@ -358,7 +328,7 @@ export default function OrdersScreen() {
                     variant="titleSmall"
                     style={[
                       styles.itemTotal,
-                      { color: theme.colors.starbucksGreen },
+                      { color: theme.colors.primary },
                     ]}
                   >
                     {formatCurrency(getItemTotalPrice(item))}
@@ -509,7 +479,7 @@ export default function OrdersScreen() {
                   }}
                   style={[
                     styles.actionButton,
-                    { backgroundColor: theme.colors.starbucksGreen },
+                    { backgroundColor: theme.colors.primary },
                   ]}
                   labelStyle={styles.actionButtonLabel}
                   icon="star"
@@ -546,14 +516,11 @@ export default function OrdersScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <LinearGradient
-        colors={[`${theme.colors.starbucksGreen}10`, 'transparent']}
-        style={styles.emptyGradient}
-      >
+      <Surface style={styles.emptyGradient} elevation={0}>
         <MaterialCommunityIcons
           name="package-variant-closed"
           size={80}
-          color={theme.colors.starbucksGreen}
+          color={theme.colors.primary}
         />
         <Text variant="headlineSmall" style={styles.emptyTitle}>
           Chưa có đơn hàng
@@ -564,7 +531,7 @@ export default function OrdersScreen() {
         >
           Bạn chưa có đơn hàng nào. {'\n'}Hãy bắt đầu đặt món yêu thích của bạn!
         </Text>
-      </LinearGradient>
+      </Surface>
     </View>
   );
 
@@ -574,7 +541,7 @@ export default function OrdersScreen() {
         <LoadingIndicator
           type="wave"
           size={60}
-          color={theme.colors.starbucksGreen}
+          color={theme.colors.primary}
           text="Đang tải đơn hàng..."
         />
       </View>
@@ -585,13 +552,8 @@ export default function OrdersScreen() {
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Header with Gradient */}
-      <LinearGradient
-        colors={[theme.colors.starbucksGreen, '#00906A']}
-        style={styles.headerGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      {/* Header (no gradient) */}
+      <View style={styles.headerGradient}>
         <Appbar.Header style={styles.transparentHeader}>
           <Appbar.Content
             title="Đơn hàng của tôi"
@@ -617,23 +579,22 @@ export default function OrdersScreen() {
                 <Surface
                   style={[
                     styles.filterChip,
-                    isSelected && {
-                      backgroundColor: theme.colors.starbucksGold,
-                    },
+                    isSelected && styles.filterChipActive,
+                    isSelected && { borderColor: theme.colors.primary },
                   ]}
-                  elevation={isSelected ? 3 : 1}
+                  elevation={0}
                 >
                   <MaterialCommunityIcons
                     name={filter.icon}
                     size={16}
-                    color={isSelected ? '#FFFFFF' : theme.colors.onSurface}
+                    color={isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant}
                   />
                   <Text
                     variant="labelMedium"
                     style={[
                       styles.filterLabel,
                       {
-                        color: isSelected ? '#FFFFFF' : theme.colors.onSurface,
+                        color: isSelected ? theme.colors.primary : theme.colors.onSurface,
                       },
                     ]}
                   >
@@ -644,7 +605,7 @@ export default function OrdersScreen() {
             );
           })}
         </ScrollView>
-      </LinearGradient>
+      </View>
 
       {/* Orders List */}
       <ScrollView
@@ -653,7 +614,7 @@ export default function OrdersScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            colors={[theme.colors.starbucksGreen]}
+            colors={[theme.colors.primary]}
           />
         }
       >
@@ -672,16 +633,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerGradient: {
-    paddingTop: 44,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   transparentHeader: {
     backgroundColor: 'transparent',
     elevation: 0,
   },
   headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: '#362415',
+    fontSize: 22,
+    fontWeight: '700',
   },
   filtersContainer: {
     paddingVertical: 16,
@@ -698,6 +661,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
     marginRight: 8,
+    backgroundColor: '#EEEEEE',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterChipActive: {
+    backgroundColor: '#E8F5E9',
   },
   filterLabel: {
     fontWeight: '600',
