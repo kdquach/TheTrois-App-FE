@@ -43,4 +43,13 @@ export const getOrderById = async (orderId) => {
     }
 };
 
+export const getOrderLogs = async (orderId) => {
+    try {
+        const data = await apiClient.get(`/orders/${orderId}/logs`);
+        return data?.data || data; // { success, data } or raw
+    } catch (error) {
+        throw error;
+    }
+};
+
 
