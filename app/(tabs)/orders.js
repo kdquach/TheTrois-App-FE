@@ -14,12 +14,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrderStore } from '../../store/orderStore';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
-import { formatCurrency, formatDate } from '../../utils/format';
+import { formatCurrency } from '../../utils/format';
 import LoadingIndicator from '../../components/LoadingIndicator';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import Toast from 'react-native-toast-message';
 import { router } from 'expo-router';
+import * as feedbackApi from '../../api/feedbackApi';
 
 // Simplified status config (no gradients, flatter color approach)
 const ORDER_STATUS_CONFIG = {
@@ -35,17 +36,79 @@ export default function OrdersScreen() {
   const theme = useTheme();
   const { user } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('pending');
+  const [selectedTab, setSelectedTab] = useState('pending'); // 'pending' | 'tracking' | 'history'
   const [expandedOrders, setExpandedOrders] = useState(new Set());
+  const [reviewLocked, setReviewLocked] = useState({}); // orderId -> true when all products already reviewed
 
-  const { orders, loading, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { orders, loading, fetchOrders, updateOrderStatus, orderLogs, fetchOrderLogs } = useOrderStore();
   const { getItemTotalPrice } = useCartStore();
+
+  // Map tab to statuses
+  const tabStatuses = {
+    pending: ['pending'],
+    tracking: ['confirmed', 'preparing', 'ready'],
+    history: ['completed', 'cancelled'],
+  };
 
   useFocusEffect(
     useCallback(() => {
-      fetchOrders(selectedStatus);
-    }, [selectedStatus])
+      fetchOrders(tabStatuses[selectedTab]);
+    }, [selectedTab])
   );
+
+  // Lightweight auto-refresh: while on Pending/Tracking tabs, refetch periodically for faster status updates
+  useFocusEffect(
+    useCallback(() => {
+      let interval;
+      let logsInterval;
+      if (selectedTab === 'pending' || selectedTab === 'tracking') {
+        interval = setInterval(() => {
+          fetchOrders(tabStatuses[selectedTab]);
+        }, 10000); // 10s refresh
+        // refresh logs for expanded orders too
+        logsInterval = setInterval(() => {
+          expandedOrders.forEach((oid) => fetchOrderLogs(oid));
+        }, 15000);
+      }
+      return () => {
+        if (interval) clearInterval(interval);
+        if (logsInterval) clearInterval(logsInterval);
+      };
+    }, [selectedTab, expandedOrders])
+  );
+
+  // Prefetch feedbacks to determine if all products in a completed order were reviewed by current user
+  useEffect(() => {
+    const run = async () => {
+      if (!user || !Array.isArray(orders) || !orders.length) return;
+      const uid = user.id || user._id;
+      const result = {};
+      // Only need to check completed orders
+      const completedOrders = orders.filter(o => o.status === 'completed');
+      for (const o of completedOrders) {
+        const products = o.products || [];
+        let allReviewed = true;
+        for (const p of products) {
+          const pid = p._id || p.productId || p.id;
+          if (!pid) continue;
+          try {
+            const data = await feedbackApi.getFeedbacks({ productId: pid, limit: 100 });
+            const list = Array.isArray(data) ? data : (data.results || data.data || []);
+            const has = list.some(f => {
+              const fu = f.userId?.id || f.userId?._id || f.userId;
+              const byMe = String(fu) === String(uid);
+              const verified = !!f.isVerifiedPurchase;
+              return byMe && verified;
+            });
+            if (!has) { allReviewed = false; break; }
+          } catch (e) { allReviewed = false; break; }
+        }
+        result[o.orderId] = allReviewed;
+      }
+      setReviewLocked(prev => ({ ...prev, ...result }));
+    };
+    run();
+  }, [orders, user]);
 
   const toggleOrderExpanded = (orderId) => {
     const newExpanded = new Set(expandedOrders);
@@ -53,67 +116,93 @@ export default function OrdersScreen() {
       newExpanded.delete(orderId);
     } else {
       newExpanded.add(orderId);
+      // Prefetch logs for accurate timeline timestamps
+      fetchOrderLogs(orderId);
     }
     setExpandedOrders(newExpanded);
   };
 
-  const filteredOrders = orders.filter(
-    (order) => order.status === selectedStatus
-  );
+  const filteredOrders = orders.filter((order) => tabStatuses[selectedTab].includes(order.status));
 
-  const renderOrderTimeline = (status) => {
-    const statuses = [
-      'pending',
-      'confirmed',
-      'preparing',
-      'ready',
-      'completed',
-      'cancelled',
-    ];
-    const currentIndex = statuses.indexOf(status);
+  const formatOrderDate = (date) => {
+    try {
+      const d = new Date(date);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const dd = d.getDate();
+      const m = d.getMonth() + 1;
+      const yyyy = d.getFullYear();
+      return `${hh}:${mm}, ${dd} thg ${m} ${yyyy}`;
+    } catch {
+      return String(date);
+    }
+  };
+
+  const renderInlineTimeline = (order) => {
+    // Build statuses based on current state
+    const isCancelled = order.status === 'cancelled';
+    // If cancelled: show only 'pending' -> 'cancelled'
+    const statuses = isCancelled
+      ? ['pending', 'cancelled']
+      : ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
+
+    const seq = ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
+    const currentIdx = seq.indexOf(order.status);
+    const PROGRESS_COLOR = theme.colors.primary; // unify green color for all progress steps
+    const CANCEL_COLOR = ORDER_STATUS_CONFIG.cancelled.color; // red
 
     return (
-      <View style={styles.timelineContainer}>
-        {statuses.map((s, index) => {
+      <View>
+        {statuses.map((s, idx) => {
           const config = ORDER_STATUS_CONFIG[s];
-          const isActive = index <= currentIndex;
-          const isCurrent = index === currentIndex;
+
+          // Determine visual state
+          let done = false;
+          if (isCancelled) {
+            done = s === 'pending'; // only the first step marked as done
+          } else {
+            const sIdx = seq.indexOf(s);
+            done = sIdx !== -1 && sIdx <= currentIdx;
+          }
+
+          // Colors: green for done, grey for upcoming; cancelled dot/connector red
+          const isLast = idx === statuses.length - 1;
+          const isCancelledStep = s === 'cancelled';
+          const dotColor = isCancelledStep ? CANCEL_COLOR : (done ? PROGRESS_COLOR : '#E0E0E0');
+          const stickColor = isLast
+            ? 'transparent'
+            : (isCancelled && !isCancelledStep ? CANCEL_COLOR : (done ? PROGRESS_COLOR : '#E0E0E0'));
+          const iconColor = isCancelledStep ? CANCEL_COLOR : (done ? PROGRESS_COLOR : '#BDBDBD');
+
+          // Timestamp per step: pending uses order.createdAt, others from logs newStatus
+          const logs = orderLogs?.[order.orderId] || [];
+          let ts = order.createdAt;
+          if (s !== 'pending') {
+            const log = logs.find((l) => l.newStatus === s);
+            if (log) ts = log.changedAt || log.createdAt;
+          }
 
           return (
-            <View key={s} style={styles.timelineItem}>
-              <View style={styles.timelineStep}>
-                <Surface
-                  style={[
-                    styles.timelineIcon,
-                    {
-                      backgroundColor: isActive ? config.color : '#E0E0E0',
-                    },
-                  ]}
-                  elevation={isActive ? 3 : 0}
-                >
-                  <MaterialCommunityIcons
-                    name={config.icon}
-                    size={isCurrent ? 20 : 16}
-                    color={isActive ? '#FFFFFF' : '#9E9E9E'}
-                  />
-                </Surface>
-                {index < statuses.length - 1 && (
-                  <View
-                    style={[
-                      styles.timelineLine,
-                      {
-                        backgroundColor: isActive ? config.color : '#E0E0E0',
-                      },
-                    ]}
-                  />
+            <View key={s} style={styles.timelineRowModal}>
+              <View style={styles.timelineLeft}>
+                <View style={[styles.dot, { backgroundColor: dotColor }]} />
+                {!isLast && (
+                  <View style={[styles.stick, { backgroundColor: stickColor }]} />
                 )}
               </View>
+              <View style={styles.timelineContent}>
+                <Text variant="titleSmall" style={{ fontWeight: '600' }}>{config.label}</Text>
+                <Text variant="bodySmall" style={{ opacity: 0.7 }}>{formatOrderDate(ts)}</Text>
+              </View>
+              <MaterialCommunityIcons name={config.icon} size={18} color={iconColor} />
             </View>
           );
         })}
       </View>
     );
   };
+
+  const getStatusColor = (status) => (status === 'cancelled' ? theme.colors.error : theme.colors.primary);
 
   const renderOrderItem = (order) => {
     const handleCancelOrder = () => {
@@ -129,7 +218,7 @@ export default function OrdersScreen() {
                 type: 'success',
                 text1: 'Hủy đơn hàng thành công',
               });
-              await fetchOrders(selectedStatus);
+              await fetchOrders(tabStatuses[selectedTab]);
             } catch (e) {
               // No-op; backend route may be missing. UI will refresh on next fetch.
             }
@@ -144,30 +233,19 @@ export default function OrdersScreen() {
 
     return (
       <Surface key={order.orderId} style={styles.orderCard} elevation={0}>
-        <View
-          style={[
-            styles.orderStatusBar,
-            { backgroundColor: `${statusConfig.color}` },
-          ]}
-        />
+        <View style={[styles.orderStatusBar, { backgroundColor: getStatusColor(order.status) }]} />
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => toggleOrderExpanded(order.orderId)}
-        >
+        <TouchableOpacity activeOpacity={0.7} onPress={() => toggleOrderExpanded(order.orderId)}>
           <View style={styles.orderHeader}>
             <View style={styles.orderHeaderLeft}>
               <Surface
-                style={[
-                  styles.orderIconContainer,
-                  { backgroundColor: `${statusConfig.color}15` },
-                ]}
+                style={[styles.orderIconContainer, { backgroundColor: `${getStatusColor(order.status)}15` }]}
                 elevation={0}
               >
                 <MaterialCommunityIcons
                   name="coffee"
                   size={24}
-                  color={statusConfig.color}
+                  color={getStatusColor(order.status)}
                 />
               </Surface>
               <View style={styles.orderHeaderInfo}>
@@ -181,32 +259,29 @@ export default function OrdersScreen() {
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  {formatDate(order.createdAt)}
+                  {formatOrderDate(order.createdAt)}
                 </Text>
+                {/* Status badge moved under order code (no shadow) */}
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+                  <MaterialCommunityIcons
+                    name={statusConfig.icon}
+                    size={14}
+                    color="#FFFFFF"
+                  />
+                  <Text variant="labelSmall" style={styles.statusText}>
+                    {statusConfig.label}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.orderHeaderRight}>
-              <Surface
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: statusConfig.color },
-                ]}
-                elevation={2}
-              >
+              <TouchableOpacity onPress={() => toggleOrderExpanded(order.orderId)}>
                 <MaterialCommunityIcons
-                  name={statusConfig.icon}
-                  size={14}
-                  color="#FFFFFF"
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={24}
+                  color={theme.colors.onSurfaceVariant}
                 />
-                <Text variant="labelSmall" style={styles.statusText}>
-                  {statusConfig.label}
-                </Text>
-              </Surface>
-              <MaterialCommunityIcons
-                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                size={24}
-                color={theme.colors.onSurfaceVariant}
-              />
+              </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -228,10 +303,10 @@ export default function OrdersScreen() {
               {order.products.length} món
             </Text>
           </View>
-                  <Text
-                    variant="titleLarge"
-                    style={[styles.totalAmount, { color: theme.colors.primary }]}
-                  >
+          <Text
+            variant="titleLarge"
+            style={styles.totalAmount}
+          >
             {formatCurrency(order.totalAmount)}
           </Text>
         </View>
@@ -241,14 +316,12 @@ export default function OrdersScreen() {
             <Divider style={styles.divider} />
 
             {/* Timeline */}
-            {order.status !== 'cancelled' && (
-              <View style={styles.timelineSection}>
-                <Text variant="labelLarge" style={styles.sectionTitle}>
-                  Trạng thái đơn hàng
-                </Text>
-                {renderOrderTimeline(order.status)}
-              </View>
-            )}
+            <View style={styles.timelineSection}>
+              <Text variant="labelLarge" style={styles.sectionTitle}>
+                Trạng thái đơn hàng
+              </Text>
+              {renderInlineTimeline(order)}
+            </View>
 
             <Divider style={styles.divider} />
 
@@ -262,11 +335,11 @@ export default function OrdersScreen() {
                   <Surface
                     style={[
                       styles.itemQuantityBadge,
-                      { backgroundColor: theme.colors.primary },
+                      { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary, borderWidth: 1 },
                     ]}
                     elevation={0}
                   >
-                    <Text variant="labelSmall" style={styles.quantityText}>
+                    <Text variant="labelSmall" style={[styles.quantityText, { color: theme.colors.primary }]}>
                       {item.quantity}
                     </Text>
                   </Surface>
@@ -339,112 +412,53 @@ export default function OrdersScreen() {
 
             <Divider style={styles.divider} />
 
-            {/* Ordering User (outside of address block) */}
-            {(user?.name || user?.phone || user?.phoneNumber) && (
-              <View style={styles.shippingSection}>
-                <View style={styles.shippingRow}>
-                  <MaterialCommunityIcons
-                    name="account-outline"
-                    size={20}
-                    color={theme.colors.onSurfaceVariant}
-                  />
-                  <Text
-                    variant="labelSmall"
-                    style={{
-                      color: theme.colors.onSurfaceVariant,
-                      opacity: 0.7,
-                    }}
-                    numberOfLines={1}
-                  >
-                    Người đặt:{' '}
-                    <Text
-                      style={{
-                        fontWeight: '600',
-                        color: theme.colors.onSurface,
-                      }}
-                    >
-                      {user?.name || 'Khách hàng'}
-                    </Text>
-                    {user?.phone || user?.phoneNumber
-                      ? `  •  ${user?.phone || user?.phoneNumber}`
-                      : ''}
-                  </Text>
-                </View>
-              </View>
-            )}
+            {/* Ordering User: not required per new spec - removed */}
 
             {/* Shipping Address */}
             {order.shippingAddress ? (
               <View style={styles.shippingSection}>
                 <View style={styles.shippingRow}>
-                  <MaterialCommunityIcons
-                    name="map-marker-outline"
-                    size={20}
-                    color={theme.colors.onSurfaceVariant}
-                  />
+                  <MaterialCommunityIcons name="map-marker" size={20} color={theme.colors.error} />
                   <Text
-                    variant="labelSmall"
-                    style={[
-                      styles.shippingLabel,
-                      { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
-                    ]}
+                    variant="bodySmall"
+                    style={[styles.shippingAddressText, { color: theme.colors.onSurface }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
-                    Địa chỉ giao hàng
+                    {order.shippingAddress}
                   </Text>
                 </View>
-                <Text
-                  variant="bodySmall"
-                  style={[
-                    styles.shippingAddress,
-                    { color: theme.colors.onSurfaceVariant, opacity: 0.85 },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {order.shippingAddress}
-                </Text>
               </View>
             ) : null}
 
             {/* Payment Info */}
             <View style={styles.paymentSection}>
-              <View style={styles.paymentRow}>
-                <MaterialCommunityIcons
-                  name="credit-card-outline"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-                <Text
-                  variant="labelSmall"
-                  style={[
-                    styles.paymentLabel,
-                    { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
-                  ]}
-                >
-                  Phương thức thanh toán
+              <View style={[styles.paymentRow, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <MaterialCommunityIcons name="credit-card-outline" size={20} color={theme.colors.onSurfaceVariant} />
+                  <Text variant="labelSmall" style={styles.paymentLabel}>Phương thức thanh toán</Text>
+                </View>
+                <Text variant="labelLarge" style={{ fontWeight: '600' }}>
+                  {order.paymentMethod === 'cash' ? 'Tiền mặt' : 'Online'}
                 </Text>
               </View>
-              <Text variant="titleMedium" style={styles.paymentMethod}>
-                {order.paymentMethod === 'cash'
-                  ? 'Tiền mặt'
-                  : 'Thanh toán online'}
-              </Text>
-              {order.status === 'pending' && (
-                <View style={styles.paymentActions}>
-                  <Button
-                    mode="outlined"
-                    compact
-                    onPress={handleCancelOrder}
-                    textColor={theme.colors.error}
-                    icon="close-circle-outline"
-                  >
-                    Hủy đơn hàng
-                  </Button>
-                </View>
-              )}
+              {/* Removed duplicate cancel button here; single cancel button remains in Action Buttons section below */}
             </View>
 
             {/* Action Buttons */}
-            {order.status === 'completed' ? (
+            {order.status === 'pending' ? (
+              <View style={styles.actionButtons}>
+                <Button
+                  mode="contained"
+                  onPress={handleCancelOrder}
+                  style={[styles.actionButton, { flex: 1, backgroundColor: '#FFEBEE' }]}
+                  textColor={theme.colors.error}
+                  icon="close-circle-outline"
+                >
+                  Hủy đơn hàng
+                </Button>
+              </View>
+            ) : order.status === 'completed' ? (
               <View style={styles.actionButtons}>
                 <Button
                   mode="outlined"
@@ -456,7 +470,7 @@ export default function OrdersScreen() {
                       try {
                         // expo-router style path
                         router.push({ pathname: '/feedback/list', params: { productId: pid } });
-                      } catch (e) {}
+                      } catch (e) { }
                     }
                   }}
                   style={styles.actionButton}
@@ -475,43 +489,29 @@ export default function OrdersScreen() {
                         return;
                       }
                       router.push({ pathname: '/feedback/order', params: { orderId: oid } });
-                    } catch (e) {}
+                    } catch (e) { }
                   }}
                   style={[
                     styles.actionButton,
-                    { backgroundColor: theme.colors.primary },
+                    // { backgroundColor: theme.colors.primary },
                   ]}
                   labelStyle={styles.actionButtonLabel}
-                  icon="star"
+                  disabled={reviewLocked[order.orderId]}
                 >
-                  Đánh giá
+                  {reviewLocked[order.orderId] ? 'Đã đánh giá' : 'Đánh giá'}
                 </Button>
               </View>
-            ) : (
-              <View style={styles.actionButtons}>
-                <Button
-                  mode="contained-tonal"
-                  disabled
-                  style={[styles.actionButton]}
-                  icon="lock"
-                >
-                  Đánh giá (chỉ khi hoàn thành)
-                </Button>
-              </View>
-            )}
+            ) : null}
           </View>
         )}
       </Surface>
     );
   };
 
-  const statusFilters = [
-    { key: 'pending', label: 'Chờ', icon: 'clock-outline' },
-    { key: 'confirmed', label: 'Đã nhận', icon: 'check-circle' },
-    { key: 'preparing', label: 'Pha chế', icon: 'coffee-maker' },
-    { key: 'ready', label: 'Sẵn sàng', icon: 'bell-ring' },
-    { key: 'completed', label: 'Hoàn thành', icon: 'check-all' },
-    { key: 'cancelled', label: 'Đã hủy', icon: 'close-circle' },
+  const tabs = [
+    { key: 'pending', label: 'Chờ xác nhận', icon: 'clock-outline' },
+    { key: 'tracking', label: 'Theo dõi đơn', icon: 'truck-delivery-outline' },
+    { key: 'history', label: 'Lịch sử đơn', icon: 'history' },
   ];
 
   const renderEmptyState = () => (
@@ -568,12 +568,12 @@ export default function OrdersScreen() {
           style={styles.filtersContainer}
           contentContainerStyle={styles.filtersContent}
         >
-          {statusFilters.map((filter) => {
-            const isSelected = selectedStatus === filter.key;
+          {tabs.map((filter) => {
+            const isSelected = selectedTab === filter.key;
             return (
               <TouchableOpacity
                 key={filter.key}
-                onPress={() => setSelectedStatus(filter.key)}
+                onPress={() => setSelectedTab(filter.key)}
                 activeOpacity={0.7}
               >
                 <Surface
@@ -621,8 +621,8 @@ export default function OrdersScreen() {
         {filteredOrders.length === 0
           ? renderEmptyState()
           : filteredOrders.map((order) => {
-              return renderOrderItem(order);
-            })}
+            return renderOrderItem(order);
+          })}
       </ScrollView>
     </View>
   );
@@ -682,6 +682,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   orderStatusBar: {
     height: 6,
@@ -706,6 +708,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orderHeaderInfo: {
+    gap: 2,
     flex: 1,
   },
   orderId: {
@@ -720,11 +723,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusBadge: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
     gap: 4,
   },
   statusText: {
@@ -793,31 +797,24 @@ const styles = StyleSheet.create({
   orderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     gap: 12,
   },
   itemQuantityBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quantityText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
+  quantityText: { fontWeight: '700' },
+  itemQuantityText: { fontWeight: '600', width: 28, textAlign: 'center' },
   itemInfo: {
     flex: 1,
   },
-  itemName: {
-    fontWeight: '600',
-    marginBottom: 2,
-  },
+  itemName: { fontWeight: '400' },
   itemPrice: {},
-  itemTotal: {
-    fontWeight: 'bold',
-  },
+  itemTotal: { fontWeight: '600', color: '#000' },
   toppingsList: {
     marginTop: 2,
     gap: 2,
@@ -873,6 +870,9 @@ const styles = StyleSheet.create({
   shippingAddress: {
     fontWeight: '600',
   },
+  shippingAddressText: {
+    flex: 1,
+  },
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -915,4 +915,11 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
   },
+  // timeline (inline) styles reused from modal naming
+  timelineRowModal: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 4 },
+  timelineLeft: { alignItems: 'center', width: 18 },
+  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 2 },
+  // make the connector continuous by letting it overlap into next row slightly
+  stick: { width: 2, flexGrow: 1, marginTop: 6, marginBottom: -4 },
+  timelineContent: { flex: 1, paddingLeft: 8 },
 });

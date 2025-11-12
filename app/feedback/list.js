@@ -116,6 +116,12 @@ export default function FeedbackListScreen() {
       return uid && fid && String(uid) === String(fid);
    };
 
+   const canReplyToFeedback = (fb) => {
+      const role = user?.role;
+      if (role === 'admin' || role === 'staff') return true;
+      return isOwner(fb);
+   };
+
    const openEdit = (fb) => {
       setEditFb(fb);
       setEditRating(Number(fb.rating) || 0);
@@ -334,7 +340,7 @@ export default function FeedbackListScreen() {
                         {/* Auto-load replies via fetchReplies(fid) elsewhere; button hidden for cleaner UI */}
 
                         {/* Reply composer: only owner can reply to their own feedback theo yêu cầu */}
-                        {isOwner(fb) && (
+                        {canReplyToFeedback(fb) && (
                            <View>
                               {!openComposer[fid] && (
                                  <Button
@@ -497,11 +503,12 @@ const styles = StyleSheet.create({
       position: 'absolute', top: 0, left: 0, right: 0,
       flexDirection: 'row', alignItems: 'center',
       paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10,
+      paddingTop: 36,
       backgroundColor: '#fff', zIndex: 20, borderBottomWidth: 1, borderColor: '#eee'
    },
    headerBack: { marginRight: 4 },
    headerTitle: { fontSize: 18, fontWeight: '700', flex: 1 },
-   scrollContent: { padding: 16, paddingTop: 70 },
+   scrollContent: { padding: 16, paddingTop: 100 },
    pageTitle: { fontWeight: 'bold', marginVertical: 12, fontSize: 18 },
 
    summaryCard: {
