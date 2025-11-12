@@ -70,21 +70,6 @@ export default function CartScreen() {
     }, [fetchCart])
   );
 
-  // bỏ chọn nhiều sản phẩm: không còn checkbox/select-all
-
-  const handleQuantityChange = (itemId, newQuantity) => {
-    if (newQuantity <= 0) {
-      removeCartItem(itemId);
-      Toast.show({
-        type: 'info',
-        text1: 'Đã xóa sản phẩm',
-        text2: 'Sản phẩm đã được xóa khỏi giỏ hàng',
-      });
-    } else {
-      updateCartItem(itemId, { quantity: newQuantity });
-    }
-  };
-
   const handleCheckout = async () => {
     if (items.length === 0) {
       Toast.show({
@@ -290,10 +275,6 @@ export default function CartScreen() {
 
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <LinearGradient
-            colors={['#F5F5F5', '#E8F5E8']}
-            style={styles.emptyGradient}
-          >
             <MaterialCommunityIcons
               name="cart-outline"
               size={100}
@@ -318,7 +299,7 @@ export default function CartScreen() {
             >
               Hãy thêm những ly trà sữa ngon tuyệt{'\n'}vào giỏ hàng của bạn!
             </Text>
-            <Surface style={styles.shopButtonContainer} elevation={3}>
+            <Surface style={styles.shopButtonContainer} elevation={0}>
               <Button
                 mode="contained"
                 onPress={() => router.push('/(tabs)/home')}
@@ -329,10 +310,9 @@ export default function CartScreen() {
                 labelStyle={styles.shopButtonLabel}
                 icon="shopping"
               >
-                Khám phá menu
+                Khám phá menu TheTrois
               </Button>
             </Surface>
-          </LinearGradient>
         </View>
       ) : (
         <View style={styles.content}>
@@ -455,7 +435,6 @@ export default function CartScreen() {
                     { backgroundColor: theme.colors.primary },
                   ]}
                   labelStyle={styles.checkoutButtonLabel}
-                  icon="credit-card"
                 >
                   Đặt đơn
                 </Button>
@@ -533,22 +512,13 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    margin: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  emptyGradient: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-  },
-  emptyIcon: {
-    marginBottom: 20,
+    gap: 12,
   },
   emptyTitle: {
     fontWeight: 'bold',
-    marginBottom: 12,
     textAlign: 'center',
   },
   emptySubtitle: {
@@ -557,17 +527,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   shopButtonContainer: {
-    marginTop: 2,
     fontSize: 12,
     overflow: 'hidden',
   },
   shopButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 8,
     borderRadius: 25,
   },
   shopButtonLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
   },

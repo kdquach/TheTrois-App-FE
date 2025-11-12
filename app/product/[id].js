@@ -532,7 +532,7 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       {/* Bottom Bar */}
-      <Surface style={styles.bottomBar} elevation={8}>
+      <Surface style={styles.bottomBar} elevation={0}>
         <View style={styles.quantitySection}>
           <Text
             variant="titleMedium"
