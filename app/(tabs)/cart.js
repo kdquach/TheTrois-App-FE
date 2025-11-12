@@ -55,7 +55,6 @@ export default function CartScreen() {
   const [overlayHeight, setOverlayHeight] = useState(0);
   const [orderNote, setOrderNote] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  
 
   useEffect(() => {
     if (user?.addresses) {
@@ -69,6 +68,19 @@ export default function CartScreen() {
       fetchCart();
     }, [fetchCart])
   );
+
+  const handleQuantityChange = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeCartItem(itemId);
+      Toast.show({
+        type: 'info',
+        text1: 'Đã xóa sản phẩm',
+        text2: 'Sản phẩm đã được xóa khỏi giỏ hàng',
+      });
+    } else {
+      updateCartItem(itemId, { quantity: newQuantity });
+    }
+  };
 
   const handleCheckout = async () => {
     if (items.length === 0) {
@@ -87,9 +99,9 @@ export default function CartScreen() {
     ]
       .filter(Boolean)
       .join(', ');
-      
-  console.log("đây là item",items);
-  const products = items.map((item) => ({
+
+    console.log('đây là item', items);
+    const products = items.map((item) => ({
       productId: item.productId?._id || item.productId,
       name: item.name,
       price: item.finalPrice || item.price,
@@ -138,7 +150,12 @@ export default function CartScreen() {
     <Swipeable
       key={item.id}
       renderRightActions={() => (
-        <View style={[styles.swipeDelete, { backgroundColor: theme.colors.dangerBright }]}>
+        <View
+          style={[
+            styles.swipeDelete,
+            { backgroundColor: theme.colors.dangerBright },
+          ]}
+        >
           <IconButton
             icon="delete"
             iconColor="#fff"
@@ -151,93 +168,101 @@ export default function CartScreen() {
     >
       <Surface style={styles.cartItem} elevation={0}>
         <View style={styles.itemContainer}>
-        {/* Image column */}
-        <View style={styles.itemImageContainer}>
-          <Avatar.Image
-            source={{ uri: item.image || 'https://via.placeholder.com/80' }}
-            size={64}
-            style={[styles.itemImage, { borderRadius: 10 }]}
-          />
-        </View>
-
-        {/* Details column */}
-        <View style={styles.itemDetails}>
-          {/* Title row */}
-          <View style={styles.itemHeader}>
-            <Text
-              variant="titleMedium"
-              style={[styles.itemName, { color: theme.colors.onSurface }]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
+          {/* Image column */}
+          <View style={styles.itemImageContainer}>
+            <Avatar.Image
+              source={{ uri: item.image || 'https://via.placeholder.com/80' }}
+              size={64}
+              style={[styles.itemImage, { borderRadius: 10 }]}
+            />
           </View>
 
-          {(() => {
-            const customization = item.customization;
-            if (!customization) return null;
-            const description = customization.description?.trim();
-            const size = customization.size || 'S';
-            const ice = customization.ice ?? 100;
-            const sugar = customization.sugar ?? 100;
-            const toppingNames = (item.toppings || [])
-              .map((t) => t?.name)
-              .filter(Boolean)
-              .join(', ');
-            const base = description || `Size ${size}, ${ice}% đá, ${sugar}% đường`;
-            const full = toppingNames ? `${base}, ${toppingNames}` : base;
-            return (
+          {/* Details column */}
+          <View style={styles.itemDetails}>
+            {/* Title row */}
+            <View style={styles.itemHeader}>
               <Text
-                variant="labelSmall"
-                style={[styles.customizationText, { color: theme.colors.onSurfaceVariant, opacity: 0.6 }]}
+                variant="titleMedium"
+                style={[styles.itemName, { color: theme.colors.onSurface }]}
                 numberOfLines={1}
-                ellipsizeMode="tail"
               >
-                {full}
+                {item.name}
               </Text>
-            );
-          })()}
+            </View>
 
-          {/* Qty and subtotal */}
-          <View style={styles.quantityAndTotal}>
-            <Surface style={styles.quantityContainer} elevation={0}>
-              <IconButton
-                icon="minus"
-                size={16}
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(item.id, item.quantity - 1)}
-              />
+            {(() => {
+              const customization = item.customization;
+              if (!customization) return null;
+              const description = customization.description?.trim();
+              const size = customization.size || 'S';
+              const ice = customization.ice ?? 100;
+              const sugar = customization.sugar ?? 100;
+              const toppingNames = (item.toppings || [])
+                .map((t) => t?.name)
+                .filter(Boolean)
+                .join(', ');
+              const base =
+                description || `Size ${size}, ${ice}% đá, ${sugar}% đường`;
+              const full = toppingNames ? `${base}, ${toppingNames}` : base;
+              return (
+                <Text
+                  variant="labelSmall"
+                  style={[
+                    styles.customizationText,
+                    { color: theme.colors.onSurfaceVariant, opacity: 0.6 },
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {full}
+                </Text>
+              );
+            })()}
+
+            {/* Qty and subtotal */}
+            <View style={styles.quantityAndTotal}>
+              <Surface style={styles.quantityContainer} elevation={0}>
+                <IconButton
+                  icon="minus"
+                  size={16}
+                  style={styles.quantityButton}
+                  onPress={() =>
+                    handleQuantityChange(item.id, item.quantity - 1)
+                  }
+                />
+                <Text
+                  variant="titleSmall"
+                  style={[styles.quantity, { color: theme.colors.onSurface }]}
+                >
+                  {item.quantity}
+                </Text>
+                <IconButton
+                  icon="plus"
+                  size={16}
+                  style={styles.quantityButton}
+                  onPress={() =>
+                    handleQuantityChange(item.id, item.quantity + 1)
+                  }
+                />
+              </Surface>
               <Text
-                variant="titleSmall"
-                style={[styles.quantity, { color: theme.colors.onSurface }]}
+                variant="titleLarge"
+                style={[styles.subtotal, { color: theme.colors.primary }]}
               >
-                {item.quantity}
+                {formatCurrency(getItemTotalPrice(item))}
               </Text>
-              <IconButton
-                icon="plus"
-                size={16}
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
-              />
-            </Surface>
+            </View>
+
+            {/* Chỉnh sửa */}
             <Text
-              variant="titleLarge"
-              style={[styles.subtotal, { color: theme.colors.primary }]}
+              variant="labelMedium"
+              style={{ color: theme.colors.primary, marginTop: 4 }}
+              onPress={() => handleEditItem(item)}
             >
-              {formatCurrency(getItemTotalPrice(item))}
+              Chỉnh sửa
             </Text>
           </View>
-
-          {/* Chỉnh sửa */}
-          <Text
-            variant="labelMedium"
-            style={{ color: theme.colors.primary, marginTop: 4 }}
-            onPress={() => handleEditItem(item)}
-          >
-            Chỉnh sửa
-          </Text>
         </View>
-      </View>
       </Surface>
     </Swipeable>
   );
@@ -275,44 +300,41 @@ export default function CartScreen() {
 
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="cart-outline"
-              size={100}
-              color={theme.colors.primary}
-              style={styles.emptyIcon}
-            />
-            <Text
-              variant="headlineMedium"
+          <MaterialCommunityIcons
+            name="cart-outline"
+            size={100}
+            color={theme.colors.primary}
+            style={styles.emptyIcon}
+          />
+          <Text
+            variant="headlineMedium"
+            style={[styles.emptyTitle, { color: theme.colors.primary }]}
+          >
+            Giỏ hàng trống
+          </Text>
+          <Text
+            variant="bodyLarge"
+            style={[
+              styles.emptySubtitle,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
+            Hãy thêm những ly trà sữa ngon tuyệt{'\n'}vào giỏ hàng của bạn!
+          </Text>
+          <Surface style={styles.shopButtonContainer} elevation={0}>
+            <Button
+              mode="contained"
+              onPress={() => router.push('/(tabs)/home')}
               style={[
-                styles.emptyTitle,
-                { color: theme.colors.primary },
+                styles.shopButton,
+                { backgroundColor: theme.colors.primary },
               ]}
+              labelStyle={styles.shopButtonLabel}
+              icon="shopping"
             >
-              Giỏ hàng trống
-            </Text>
-            <Text
-              variant="bodyLarge"
-              style={[
-                styles.emptySubtitle,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              Hãy thêm những ly trà sữa ngon tuyệt{'\n'}vào giỏ hàng của bạn!
-            </Text>
-            <Surface style={styles.shopButtonContainer} elevation={0}>
-              <Button
-                mode="contained"
-                onPress={() => router.push('/(tabs)/home')}
-                style={[
-                  styles.shopButton,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                labelStyle={styles.shopButtonLabel}
-                icon="shopping"
-              >
-                Khám phá menu TheTrois
-              </Button>
-            </Surface>
+              Khám phá menu TheTrois
+            </Button>
+          </Surface>
         </View>
       ) : (
         <View style={styles.content}>
@@ -325,7 +347,14 @@ export default function CartScreen() {
             ]}
           >
             {/* Row 1: Title */}
-            <Text variant="titleLarge" style={{ fontWeight: '700', marginBottom: 8, color: theme.colors.onSurface }}>
+            <Text
+              variant="titleLarge"
+              style={{
+                fontWeight: '700',
+                marginBottom: 8,
+                color: theme.colors.onSurface,
+              }}
+            >
               Danh sách sản phẩm
             </Text>
 
@@ -338,7 +367,11 @@ export default function CartScreen() {
                   textColor={theme.colors.onBackground}
                   onPress={() => {
                     clearCart();
-                    Toast.show({ type: 'info', text1: 'Đã xóa tất cả', text2: 'Giỏ hàng đã được xóa sạch' });
+                    Toast.show({
+                      type: 'info',
+                      text1: 'Đã xóa tất cả',
+                      text2: 'Giỏ hàng đã được xóa sạch',
+                    });
                   }}
                 >
                   Xóa giỏ hàng
@@ -347,37 +380,127 @@ export default function CartScreen() {
             )}
 
             {/* Row 3: Items list */}
-            <View style={{ marginTop: 8 }}>
-              {items.map(renderCartItem)}
-            </View>
+            <View style={{ marginTop: 8 }}>{items.map(renderCartItem)}</View>
 
             {/* Row 4: Address row */}
             <Surface style={styles.addressRow} elevation={0}>
-              <View style={[styles.addressIconWrapper, { backgroundColor: `${theme.colors.dangerBright}15` }] }>
-                <MaterialCommunityIcons name="map-marker" size={18} color={theme.colors.dangerBright} />
+              <View
+                style={[
+                  styles.addressIconWrapper,
+                  { backgroundColor: `${theme.colors.dangerBright}15` },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="map-marker"
+                  size={18}
+                  color={theme.colors.dangerBright}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text variant="titleSmall" style={{ fontWeight: '700', color: theme.colors.onSurface, marginBottom: 2 }}>Địa chỉ giao hàng</Text>
-                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={2}>
-                  {[selectedAddress?.street, selectedAddress?.ward?.name, selectedAddress?.district?.name, selectedAddress?.city?.name].filter(Boolean).join(', ') || 'Chưa có địa chỉ' }
+                <Text
+                  variant="titleSmall"
+                  style={{
+                    fontWeight: '700',
+                    color: theme.colors.onSurface,
+                    marginBottom: 2,
+                  }}
+                >
+                  Địa chỉ giao hàng
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                  numberOfLines={2}
+                >
+                  {[
+                    selectedAddress?.street,
+                    selectedAddress?.ward?.name,
+                    selectedAddress?.district?.name,
+                    selectedAddress?.city?.name,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'Chưa có địa chỉ'}
                 </Text>
               </View>
-              <IconButton icon="chevron-right" onPress={() => router.push({ pathname: '/addresses', params: { from: 'cart' } })} />
+              <IconButton
+                icon="chevron-right"
+                onPress={() =>
+                  router.push({
+                    pathname: '/addresses',
+                    params: { from: 'cart' },
+                  })
+                }
+              />
             </Surface>
 
             {/* Row 5: Payment methods */}
             <Surface style={styles.paymentRow} elevation={0}>
-              <Text variant="titleSmall" style={{ fontWeight: '700', color: theme.colors.onSurface, marginBottom: 8 }}>Phương thức thanh toán</Text>
+              <Text
+                variant="titleSmall"
+                style={{
+                  fontWeight: '700',
+                  color: theme.colors.onSurface,
+                  marginBottom: 8,
+                }}
+              >
+                Phương thức thanh toán
+              </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={[styles.payOption, paymentMethod === 'cash' && styles.payOptionActive, paymentMethod === 'cash' && { borderColor: theme.colors.primary }]}>
-                  <MaterialCommunityIcons name="cash" size={18} color={paymentMethod === 'cash' ? theme.colors.primary : theme.colors.onSurfaceVariant} />
-                  <Text style={[styles.payOptionText, { color: paymentMethod === 'cash' ? theme.colors.primary : theme.colors.onSurface }]} onPress={() => setPaymentMethod('cash')}>
+                <View
+                  style={[
+                    styles.payOption,
+                    paymentMethod === 'cash' && styles.payOptionActive,
+                    paymentMethod === 'cash' && {
+                      borderColor: theme.colors.primary,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="cash"
+                    size={18}
+                    color={
+                      paymentMethod === 'cash'
+                        ? theme.colors.primary
+                        : theme.colors.onSurfaceVariant
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.payOptionText,
+                      {
+                        color:
+                          paymentMethod === 'cash'
+                            ? theme.colors.primary
+                            : theme.colors.onSurface,
+                      },
+                    ]}
+                    onPress={() => setPaymentMethod('cash')}
+                  >
                     Thanh toán khi nhận hàng
                   </Text>
                 </View>
-                <View style={[styles.payOption, paymentMethod === 'vnpay' && styles.payOptionActive, paymentMethod === 'vnpay' && { borderColor: theme.colors.primary }]}>
+                <View
+                  style={[
+                    styles.payOption,
+                    paymentMethod === 'vnpay' && styles.payOptionActive,
+                    paymentMethod === 'vnpay' && {
+                      borderColor: theme.colors.primary,
+                    },
+                  ]}
+                >
                   <View style={styles.vnPayLogoCircle} />
-                  <Text style={[styles.payOptionText, { color: paymentMethod === 'vnpay' ? theme.colors.primary : theme.colors.onSurface }]} onPress={() => setPaymentMethod('vnpay')}>
+                  <Text
+                    style={[
+                      styles.payOptionText,
+                      {
+                        color:
+                          paymentMethod === 'vnpay'
+                            ? theme.colors.primary
+                            : theme.colors.onSurface,
+                      },
+                    ]}
+                    onPress={() => setPaymentMethod('vnpay')}
+                  >
                     VNPay
                   </Text>
                 </View>
@@ -400,10 +523,7 @@ export default function CartScreen() {
             </Section>
           </ScrollView>
 
-          <Surface
-            style={styles.summaryOverlay}
-            elevation={0}
-          >
+          <Surface style={styles.summaryOverlay} elevation={0}>
             <LinearGradient
               colors={[theme.colors.surface, theme.colors.primaryContainer]}
               style={styles.summaryGradient}
@@ -412,15 +532,15 @@ export default function CartScreen() {
             >
               <View style={styles.summaryDetails}>
                 <View style={styles.summaryRow}>
-                  <Text
-                    variant="titleLarge"
-                    style={styles.totalLabel}
-                  >
+                  <Text variant="titleLarge" style={styles.totalLabel}>
                     Tổng cộng
                   </Text>
                   <Text
                     variant="headlineSmall"
-                    style={[styles.totalAmount, { color: theme.colors.primary }]}
+                    style={[
+                      styles.totalAmount,
+                      { color: theme.colors.primary },
+                    ]}
                   >
                     {formatCurrency(cart.totalPrice)}
                   </Text>
