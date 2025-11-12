@@ -49,7 +49,7 @@ export default function OrderReviewScreen() {
     const status = order.status;
     if (status !== 'completed') {
       Toast.show({ type: 'info', text1: 'Chỉ đánh giá đơn đã hoàn thành' });
-      try { router.back(); } catch(e) {}
+      try { router.back(); } catch (e) { }
     }
   }, [order]);
 
@@ -71,7 +71,7 @@ export default function OrderReviewScreen() {
             return String(fu) === String(uid);
           });
           if (has) result[pid] = true;
-        } catch (e) {}
+        } catch (e) { }
       }));
       setAlreadyReviewed(result);
     };
@@ -132,44 +132,57 @@ export default function OrderReviewScreen() {
   const products = order.products || [];
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
-      <View style={styles.headerPlaceholder}>
-        <IconButton icon="arrow-left" size={24} onPress={() => router.back()} style={styles.backButton} />
-        <Text variant="headlineSmall" style={styles.title}>Đánh giá đơn hàng #{String(order.orderId || order.id).slice(-4)}</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Flat header row */}
+      <View style={styles.headerRow}>
+        <IconButton icon="arrow-left" size={22} onPress={() => router.back()} style={styles.headerBack} />
+        <Text variant="titleLarge" style={styles.headerText}>Đánh giá đơn hàng #{String(order.orderId || order.id).slice(-4)}</Text>
       </View>
-      <Surface style={styles.note} elevation={0}>
-        <Text variant="bodySmall" style={{ opacity: 0.7 }}>Chỉ những sản phẩm bạn chọn sao sẽ được gửi. Nội dung trống sẽ tự điền "Tốt".</Text>
-      </Surface>
-      {products.map(p => {
-        const pid = p.productId || p.id || p._id;
-        return (
-          <ProductReviewRow
-            key={pid}
-            product={p}
-            onChange={handleRowChange}
-            disabled={alreadyReviewed[pid]}
-          />
-        );
-      })}
-      <Button
-        mode="contained"
-        onPress={handleSubmitAll}
-        loading={submitting}
-        style={styles.submitBtn}
-        disabled={submitting}
-      >
-        Gửi đánh giá đã chọn
-      </Button>
-    </ScrollView>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
+        {products.map(p => {
+          const pid = p.productId || p.id || p._id;
+          return (
+            <ProductReviewRow
+              key={pid}
+              product={p}
+              onChange={handleRowChange}
+              disabled={alreadyReviewed[pid]}
+            />
+          );
+        })}
+        <Button
+          mode="contained"
+          onPress={handleSubmitAll}
+          loading={submitting}
+          style={styles.submitBtn}
+          disabled={submitting}
+        >
+          Gửi đánh giá đã chọn
+        </Button>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingTop: 56 },
-  headerPlaceholder: { position: 'relative', marginBottom: 8 },
-  backButton: { position: 'absolute', top: -8, left: -8, borderRadius: 20 },
-  title: { fontWeight: 'bold', marginBottom: 12, paddingLeft: 32 },
-  note: { marginBottom: 12 },
-  submitBtn: { marginTop: 8, borderRadius: 24 },
+  scrollContent: { padding: 16, paddingBottom: 32 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingTop: 30,
+    paddingBottom: 6,
+    gap: 4,
+  },
+  headerBack: { margin: 0 },
+  headerText: { fontSize: 20, fontWeight: '700', flexShrink: 1 },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  infoText: { opacity: 0.7 },
+  submitBtn: { borderRadius: 28, marginTop: 8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

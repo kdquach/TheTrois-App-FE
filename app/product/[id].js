@@ -41,6 +41,7 @@ export default function ProductDetailScreen() {
   const { products } = useProductStore();
   const { addToCart } = useCartStore();
   const { fetchFeedbacks, stats } = useFeedbackStore();
+  const [showHeaderTitle, setShowHeaderTitle] = useState(false);
 
   // Find product by id (string comparison)
   const product = products.find((p) => p.id === id || p.id === String(id));
@@ -205,48 +206,44 @@ export default function ProductDetailScreen() {
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Header with Image */}
-      <View style={styles.imageSection}>
-        <Image
-          source={{ uri: product.image }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay} />
-
-        {/* Back Button */}
-        <Surface style={styles.backButton} elevation={4}>
-          <IconButton
-            icon="arrow-left"
-            iconColor={theme.colors.onSurface}
-            size={24}
-            onPress={() => router.back()}
-          />
-        </Surface>
-
-        {/* Favorite Button */}
-        <Surface style={styles.favoriteButton} elevation={4}>
-          <IconButton
-            icon={isFavorite ? 'heart' : 'heart-outline'}
-            iconColor={isFavorite ? '#FF6B6B' : theme.colors.onSurface}
-            size={24}
-            onPress={() => setIsFavorite(!isFavorite)}
-          />
-        </Surface>
-
-        {/* Product Info Overlay simplified */}
-        <View style={styles.productInfoOverlay}>
-          <Text variant="headlineSmall" style={styles.productTitle}>{product.name}</Text>
-          <View style={styles.ratingContainer}>
-            <MaterialCommunityIcons name="star" size={18} color={theme.colors.primary} />
-            <Text variant="titleMedium" style={styles.ratingText}>{stats.average?.toFixed ? stats.average.toFixed(1) : stats.average}</Text>
-            <Text variant="bodyMedium" style={styles.reviewCount} onPress={() => router.push({ pathname: '/feedback/list', params: { productId: product?.id || String(id) } })}>({stats.count} đánh giá)</Text>
-          </View>
-        </View>
+      {/* Fixed header: shows title after scrolling */}
+      <View style={[styles.headerRow, { backgroundColor: showHeaderTitle ? '#FFFFFF' : 'transparent', borderBottomWidth: showHeaderTitle ? 1 : 0, borderBottomColor: '#E0E0E0' }]}>
+        <IconButton icon="arrow-left" size={22} onPress={() => router.back()} style={{ margin: 0 }} iconColor={showHeaderTitle ? theme.colors.onSurface : '#FFFFFF'} />
+        {showHeaderTitle ? (
+          <Text variant="titleLarge" style={styles.headerTitle}>{product.name}</Text>
+        ) : null}
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          setShowHeaderTitle(y > height * 0.28);
+        }}
+        scrollEventThrottle={16}
+      >
+        {/* Image at top, will scroll away; full width */}
+        <View style={styles.imageSection}>
+          <Image
+            source={{ uri: product.image }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay} />
+          {/* Product Info Overlay on image */}
+          <View style={styles.productInfoOverlay}>
+            <Text variant="headlineSmall" style={styles.productTitle}>{product.name}</Text>
+            <View style={styles.ratingContainer}>
+              <MaterialCommunityIcons name="star" size={18} color={theme.colors.primary} />
+              <Text variant="titleMedium" style={styles.ratingText}>{stats.average?.toFixed ? stats.average.toFixed(1) : stats.average}</Text>
+              <Text variant="bodyMedium" style={styles.reviewCount} onPress={() => router.push({ pathname: '/feedback/list', params: { productId: product?.id || String(id) } })}>({stats.count} đánh giá)</Text>
+            </View>
+          </View>
+        </View>
+        {/* Content wrapper to add horizontal padding for sections only */}
+        <View style={styles.contentInner}>
         {/* Description */}
         <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
@@ -275,7 +272,7 @@ export default function ProductDetailScreen() {
         </Surface>
 
         {/* Size Selection */}
-        <Surface style={styles.section} elevation={0}>
+  <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="cup" size={20} color={theme.colors.primary} />
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Chọn size</Text>
@@ -296,10 +293,10 @@ export default function ProductDetailScreen() {
               );
             })}
           </View>
-        </Surface>
+  </Surface>
 
         {/* Ice Level */}
-        <Surface style={styles.section} elevation={0}>
+  <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="snowflake" size={20} color={theme.colors.primary} />
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Lượng đá: {iceLevel}%</Text>
@@ -308,17 +305,21 @@ export default function ProductDetailScreen() {
             {[0,50,75,100].map(level => (
               <Chip
                 key={level}
-                selected={iceLevel === level}
                 onPress={() => setIceLevel(level)}
-                style={[styles.levelChip,{ backgroundColor: '#eee' }, iceLevel === level && { backgroundColor: '#E8F5E9' }]}
+                style={[
+                  styles.levelChip,
+                  { backgroundColor: '#EEEEEE', borderWidth: 1, borderColor: 'transparent' },
+                  iceLevel === level && { backgroundColor: '#E8F5E9'},
+                ]}
+                contentStyle={{ justifyContent: 'center' }}
                 textStyle={[styles.levelChipText, iceLevel === level && { color: theme.colors.primary, fontWeight: '700' }]}
               >{level}%</Chip>
             ))}
           </View>
-        </Surface>
+  </Surface>
 
         {/* Sugar Level */}
-        <Surface style={styles.section} elevation={0}>
+  <Surface style={styles.section} elevation={0}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="grain" size={20} color={theme.colors.primary} />
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Lượng đường: {sugarLevel}%</Text>
@@ -327,9 +328,13 @@ export default function ProductDetailScreen() {
             {[0,50,70,100].map(level => (
               <Chip
                 key={level}
-                selected={sugarLevel === level}
                 onPress={() => setSugarLevel(level)}
-                style={[styles.levelChip,{ backgroundColor: '#eee' }, sugarLevel === level && { backgroundColor: '#E8F5E9' }]}
+                style={[
+                  styles.levelChip,
+                  { backgroundColor: '#EEEEEE', borderWidth: 1, borderColor: 'transparent' },
+                  sugarLevel === level && { backgroundColor: '#E8F5E9' },
+                ]}
+                contentStyle={{ justifyContent: 'center' }}
                 textStyle={[styles.levelChipText, sugarLevel === level && { color: theme.colors.primary, fontWeight: '700' }]}
               >{level}%</Chip>
             ))}
@@ -369,14 +374,16 @@ export default function ProductDetailScreen() {
         </Surface>
 
         <View style={styles.bottomSpacing} />
+        </View>
       </ScrollView>
 
       {/* Bottom Bar */}
       <Surface style={styles.bottomBar} elevation={0}>
         <View style={styles.bottomTopRow}>
           <View style={styles.totalColumn}>
-            <Text style={styles.totalLabel}>Tổng cộng</Text>
-            <Text style={[styles.totalPriceValue, { color: theme.colors.primary }]}>{formatCurrency(calculateTotalPrice())}</Text>
+            <Text style={styles.totalOneLiner}>
+              Tổng cộng: <Text style={[styles.totalPriceValue, { color: theme.colors.primary }]}>{formatCurrency(calculateTotalPrice())}</Text>
+            </Text>
           </View>
           <Surface style={styles.modalQuantityContainer} elevation={0}>
             <IconButton icon="minus" size={16} iconColor={theme.colors.onSurface} style={styles.modalQtyBtn} disabled={quantity<=1} onPress={() => setQuantity(Math.max(1, quantity-1))} />
@@ -403,6 +410,9 @@ const styles = StyleSheet.create({
   imageSection: {
     height: height * 0.4,
     position: 'relative',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
@@ -435,6 +445,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
+  headerRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 44, /* status bar approx */
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 20,
+  },
+  headerTitle: { fontWeight: '700', flexShrink: 1 },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -450,18 +474,20 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
+  contentInner: { paddingHorizontal: 16, paddingTop: 12 },
   section: {
-    marginBottom: 20,
-    padding: 16,
+    marginBottom: 12,
+    padding: 12,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
     marginLeft: 8,
@@ -469,20 +495,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   description: {
-    lineHeight: 24,
-    marginBottom: 8,
+    lineHeight: 22,
+    marginBottom: 6,
   },
-  sizeRow: { flexDirection: 'row', gap: 10 },
+  sizeRow: { flexDirection: 'row', gap: 8 },
   sizeTile: { flex: 1, backgroundColor: '#eee', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center' },
   sizeTileActive: { backgroundColor: '#E8F5E9' },
   sizeTileLabel: { fontWeight: '700', fontSize: 13, color: '#362415', marginBottom: 2 },
   sizeTileLabelActive: { color: '#00ac45', fontWeight: '700' },
   sizeTileExtra: { fontSize: 12, color: '#604c4c' },
   sizeTileExtraActive: { color: '#00ac45', fontWeight: '700' },
-  levelButtons: { flexDirection: 'row', gap: 10 },
+  levelButtons: { flexDirection: 'row', gap: 8 },
   levelChip: { flex: 1 },
   levelChipText: { fontSize: 12 },
-  toppingsColumn: { gap: 12 },
+  toppingsColumn: { gap: 10 },
   toppingItem: { backgroundColor: '#F8F9FA', borderRadius: 12, overflow: 'hidden' },
   toppingItemActive: { backgroundColor: '#E8F5E9' },
   toppingInner: { padding: 12 },
@@ -491,9 +517,7 @@ const styles = StyleSheet.create({
   toppingNameActive: { color: '#00ac45', fontWeight: '700' },
   toppingPriceText: { color: '#604c4c', marginTop: 2 },
   toppingPriceTextActive: { color: '#00ac45', fontWeight: '700', marginTop: 2 },
-  bottomSpacing: {
-    height: 20,
-  },
+  bottomSpacing: { height: 16 },
   bottomBar: { padding: 16, borderTopWidth: 1, borderTopColor: '#E0E0E0', backgroundColor: '#FFFFFF', gap: 12 },
   bottomTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalQuantityContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eeeeee', borderRadius: 18, paddingHorizontal: 6, paddingVertical: 2 },
@@ -501,6 +525,7 @@ const styles = StyleSheet.create({
   modalQtyValue: { marginHorizontal: 8, minWidth: 14, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#362415' },
   totalColumn: { },
   totalLabel: { fontWeight: '600', color: '#362415', marginBottom: 2 },
+  totalOneLiner: { fontWeight: '600', color: '#362415' },
   totalPriceValue: { fontWeight: '700', fontSize: 18 },
   addToCartButton: { borderRadius: 25, paddingHorizontal: 24 },
   addToCartButtonFull: { marginTop: 4, borderRadius: 25 },

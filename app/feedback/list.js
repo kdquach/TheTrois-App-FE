@@ -384,11 +384,6 @@ export default function FeedbackListScreen() {
                );
             })}
 
-            {/* Debug: show raw replies object keys */}
-            <Text style={{ fontSize: 10, color: '#999', textAlign: 'center', marginTop: 8 }}>
-               {`Reply keys: ${Object.keys(replies).join(', ')}`}
-            </Text>
-
             {/* Edit feedback dialog */}
             <Portal>
                {/* Edit feedback */}
@@ -507,7 +502,7 @@ const styles = StyleSheet.create({
    headerBack: { marginRight: 4 },
    headerTitle: { fontSize: 18, fontWeight: '700', flex: 1 },
    scrollContent: { padding: 16, paddingTop: 70 },
-   pageTitle: { fontWeight: 'bold', marginBottom: 12, fontSize: 18 },
+   pageTitle: { fontWeight: 'bold', marginVertical: 12, fontSize: 18 },
 
    summaryCard: {
       padding: 20,
